@@ -40,6 +40,10 @@ export default function MenuScreen() {
       <Text style={styles.instructions}>
         HOW TO PLAY: Hold the rectangle until it fills white, then release as fast as you can!
       </Text>
+
+      <TouchableOpacity style={styles.tutorialButton} onPress={() => router.push('/tutorial')}>
+        <Text style={styles.tutorialText}>Tutorial</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -99,5 +103,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     maxWidth: 300,
+    marginBottom: 18,
+  },
+  tutorialButton: {
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+  },
+  tutorialText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
