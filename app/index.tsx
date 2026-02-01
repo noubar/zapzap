@@ -1,40 +1,111 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { User, Users } from 'lucide-react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function MenuScreen() {
-  const navigateToGame = (playerCount: number) => {
-    router.push({
-      pathname: '/game',
-      params: { players: playerCount.toString() }
-    });
-  };
+  const [fingerMode, setFingerMode] = useState<1 | 2>(1);
+
+  const menuOptions = useMemo(
+    () => [
+      {
+        id: 'single-1',
+        label: 'Single Player',
+        subtext: 'Test your reaction time',
+        icon: <User size={40} color="#fff" />,
+        onPress: () => router.push('/SinglePlayerGame'),
+        fingerMode: 1 as const,
+      },
+      {
+        id: 'single-2',
+        label: 'Single Player - 2 Fingers',
+        subtext: 'Test your reaction time with two fingers',
+        icon: <User size={40} color="#fff" />,
+        onPress: () => router.push('/TwoFingerSinglePlayerGame'),
+        fingerMode: 2 as const,
+      },
+      {
+        id: 'two-1',
+        label: 'Two Players - 1 Finger',
+        subtext: 'Classic (one box per player)',
+        icon: <Users size={40} color="#fff" />,
+        onPress: () => router.push('/TwoPlayerGame'),
+        fingerMode: 1 as const,
+      },
+      {
+        id: 'two-2',
+        label: 'Two Players - 2 Fingers',
+        subtext: 'Each player holds two boxes',
+        icon: <Users size={40} color="#fff" />,
+        onPress: () => router.push('/TwoVsTwoGame'),
+        fingerMode: 2 as const,
+      },
+    ],
+    []
+  );
+
+  const visibleOptions = useMemo(
+    () => menuOptions.filter((option) => option.fingerMode === fingerMode),
+    [fingerMode, menuOptions]
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Zap Zap</Text>
       <Text style={styles.title}>A Reaction Game</Text>
       <Text style={styles.subtitle}>Choose Game Mode</Text>
-      
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={() => navigateToGame(1)}
-        >
-          <User size={40} color="#fff" />
-          <Text style={styles.buttonText}>Single Player</Text>
-          <Text style={styles.buttonSubtext}>Test your reaction time</Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={() => navigateToGame(2)}
+      <View style={styles.switchContainer}>
+        <TouchableOpacity
+          style={[
+            styles.switchButton,
+            fingerMode === 1 && styles.switchButtonActive,
+          ]}
+          onPress={() => setFingerMode(1)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: fingerMode === 1 }}
         >
-          <Users size={40} color="#fff" />
-          <Text style={styles.buttonText}>Two Players</Text>
-          <Text style={styles.buttonSubtext}>Challenge a friend</Text>
+          <Text
+            style={[
+              styles.switchButtonText,
+              fingerMode === 1 && styles.switchButtonTextActive,
+            ]}
+          >
+            1 Finger
+          </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.switchButton,
+            fingerMode === 2 && styles.switchButtonActive,
+          ]}
+          onPress={() => setFingerMode(2)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: fingerMode === 2 }}
+        >
+          <Text
+            style={[
+              styles.switchButtonText,
+              fingerMode === 2 && styles.switchButtonTextActive,
+            ]}
+          >
+            2 Fingers
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        {visibleOptions.map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={styles.menuButton}
+            onPress={option.onPress}
+          >
+            {option.icon}
+            <Text style={styles.buttonText}>{option.label}</Text>
+            <Text style={styles.buttonSubtext}>{option.subtext}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <Text style={styles.instructions}>
@@ -62,8 +133,35 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     color: '#ccc',
-    marginBottom: 50,
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  switchContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 999,
+    overflow: 'hidden',
+    marginBottom: 30,
+  },
+  switchButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  switchButtonActive: {
+    backgroundColor: '#fff',
+  },
+  switchButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  switchButtonTextActive: {
+    color: '#000',
   },
   buttonContainer: {
     width: '100%',
