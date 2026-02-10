@@ -2,11 +2,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { scheduleOnRN } from 'react-native-worklets';
-import DifficultySelector from '../components/DifficultySelector';
+import DifficultySelector from './DifficultySelector';
 
 type Finger = 'left' | 'right';
 
-interface TwoFingerSinglePlayerGameContentProps {
+interface TwoFingerSinglePlayerContent {
   filledFinger: Finger | null;
   onFingerPressIn: (finger: Finger) => void;
   onFingerPressOut: (finger: Finger) => void;
@@ -22,8 +22,8 @@ interface TwoFingerSinglePlayerGameContentProps {
   levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
 }
 
-export default function TwoFingerSinglePlayerGameContent(
-  props: TwoFingerSinglePlayerGameContentProps
+export default function TwoFingerSinglePlayerContent(
+  props: TwoFingerSinglePlayerContent
 ) {
   const {
     filledFinger,

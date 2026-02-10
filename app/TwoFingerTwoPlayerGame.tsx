@@ -2,7 +2,7 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import TwoVsTwoGameContent from '../components/TwoVsTwoGameContent';
+import TwoVsTwoGameContent from '../components/TwoFingerTwoPlayerContent';
 
 type Player = 'p1' | 'p2';
 type BoxIndex = 0 | 1;

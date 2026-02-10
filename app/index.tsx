@@ -13,7 +13,7 @@ export default function MenuScreen() {
         label: 'Single Player',
         subtext: 'Test your reaction time',
         icon: <User size={40} color="#fff" />,
-        onPress: () => router.push('/SinglePlayerGame'),
+        onPress: () => router.push('/OneFingerSinglePlayerGame'),
         fingerMode: 1 as const,
       },
       {
@@ -26,10 +26,10 @@ export default function MenuScreen() {
       },
       {
         id: 'two-1',
-        label: 'Two Players - 1 Finger',
+        label: 'Two Players',
         subtext: 'Classic (one box per player)',
         icon: <Users size={40} color="#fff" />,
-        onPress: () => router.push('/TwoPlayerGame'),
+        onPress: () => router.push('/OneFingerTwoPlayerGame'),
         fingerMode: 1 as const,
       },
       {
@@ -37,7 +37,7 @@ export default function MenuScreen() {
         label: 'Two Players - 2 Fingers',
         subtext: 'Each player holds two boxes',
         icon: <Users size={40} color="#fff" />,
-        onPress: () => router.push('/TwoVsTwoGame'),
+        onPress: () => router.push('/TwoFingerTwoPlayerGame'),
         fingerMode: 2 as const,
       },
     ],

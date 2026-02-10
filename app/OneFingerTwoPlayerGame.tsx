@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import TwoPlayerGameContent from '../components/TwoPlayerGameContent';
+import TwoPlayerGameContent from '../components/OneFingerTwoPlayerContent';
 
 
 type Player = 'p1' | 'p2';

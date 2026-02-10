@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
-import SinglePlayerGameScreen from './SinglePlayerGame';
-import TwoPlayerGameScreen from './TwoPlayerGame';
+import SinglePlayerGameScreen from './OneFingerSinglePlayerGame';
+import TwoPlayerGameScreen from './OneFingerTwoPlayerGame';
 
 export default function GameScreen() {
   const { players } = useLocalSearchParams();

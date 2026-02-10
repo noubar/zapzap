@@ -4,7 +4,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 type Player = 'p1' | 'p2';
 
-interface TwoPlayerGameContentProps {
+interface OneFingerTwoPlayerContent {
   isFilled: boolean;
   lives: { p1: number; p2: number };
   onPlayerPressIn: (player: Player) => void;
@@ -18,7 +18,7 @@ interface TwoPlayerGameContentProps {
   hasTouchedToStart: { p1: boolean; p2: boolean };
 }
 
-export default function TwoPlayerGameContent(props: TwoPlayerGameContentProps) {
+export default function TwoPlayerGameContent(props: OneFingerTwoPlayerContent) {
   const {
     isFilled,
     lives,

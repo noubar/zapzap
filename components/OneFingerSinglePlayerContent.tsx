@@ -1,8 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import DifficultySelector from '../components/DifficultySelector';
+import DifficultySelector from './DifficultySelector';
 
-interface SinglePlayerGameContentProps {
+interface OneFingerSinglePlayerContent {
     isFilled: boolean;
     handlePressIn: () => void;
     handlePressOut: () => void;
@@ -18,7 +18,7 @@ interface SinglePlayerGameContentProps {
     levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
 }
 
-export default function SinglePlayerGameContent(props: SinglePlayerGameContentProps) {
+export default function SinglePlayerGameContent(props: OneFingerSinglePlayerContent) {
   const {
     isFilled,
     handlePressIn,
@@ -60,7 +60,7 @@ export default function SinglePlayerGameContent(props: SinglePlayerGameContentPr
         hasTouchedToStart={hasTouchedToStart}
         levels={difficultyLevels}
         />
-      <View style={[styles.rectangle, styles.rectangleBottom, isFilled && styles.filled]}>
+      <View style={[styles.rectangle, isFilled && styles.filled]}>
         <Pressable
           style={styles.fullSize}
           onPressIn={handlePressIn}
@@ -93,8 +93,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 5,
     borderColor: 'white',
-  },
-  rectangleBottom: {
     bottom: '5%',
   },
   filled: {

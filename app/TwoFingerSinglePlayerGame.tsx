@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import TwoFingerSinglePlayerGameContent from '../components/TwoFingerSinglePlayerGameContent';
+import TwoFingerSinglePlayerGameContent from '../components/TwoFingerSinglePlayerContent';
 
 type Finger = 'left' | 'right';
 

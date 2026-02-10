@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import SinglePlayerGameContent from '../components/SinglePlayerGameContent';
+import SinglePlayerGameContent from '../components/OneFingerSinglePlayerContent';
 
 const difficultyLevels = [
   { label: 'Easy', value: 'easy' as 'easy', reactionLimit: 500 },

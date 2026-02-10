@@ -7,7 +7,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 type Player = 'p1' | 'p2';
 type BoxIndex = 0 | 1;
 
-interface TwoVsTwoGameContentProps {
+interface TwoFingerTwoPlayerContent {
   targets: { p1: number | null; p2: number | null };
   lives: { p1: number; p2: number };
   onBoxPressIn: (player: Player, index: BoxIndex) => void;
@@ -21,7 +21,7 @@ interface TwoVsTwoGameContentProps {
   hasTouchedToStart: { p1: boolean; p2: boolean };
 }
 
-export default function TwoVsTwoGameContent(props: TwoVsTwoGameContentProps) {
+export default function TwoVsTwoGameContent(props: TwoFingerTwoPlayerContent) {
   const {
     targets,
     lives,
@@ -90,7 +90,7 @@ export default function TwoVsTwoGameContent(props: TwoVsTwoGameContentProps) {
       </Text>
 
       {/* TOP: Player 2 Boxes */}
-      <View style={styles.playerBlockTop}>
+      <View style={[styles.rectangle, styles.rectangleTop]}>
         <View style={styles.boxRow}>
           {renderBox('p2', 0)}
           {renderBox('p2', 1)}
@@ -109,7 +109,7 @@ export default function TwoVsTwoGameContent(props: TwoVsTwoGameContentProps) {
       <Text style={styles.statusText}>{gameState.toUpperCase()}</Text>
 
       {/* BOTTOM: Player 1 Boxes */}
-      <View style={styles.playerBlockBottom}>
+      <View style={[styles.rectangle, styles.rectangleBottom]}>
         <View style={styles.boxRow}>
           {renderBox('p1', 0)}
           {renderBox('p1', 1)}
@@ -136,20 +136,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'black',
   },
-  playerBlockTop: {
+  rectangle: {
     position: 'absolute',
-    top: '4%',
     left: 0,
     right: 0,
     alignItems: 'center',
+
+  },
+  rectangleTop: {
+    top: '4%',
     transform: [{ rotate: '180deg' }],
   },
-  playerBlockBottom: {
-    position: 'absolute',
+  rectangleBottom: {
     bottom: '6%',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
   },
   boxRow: {
     width: '90%',
