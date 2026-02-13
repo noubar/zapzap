@@ -1,8 +1,10 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import SinglePlayerGameContent from '../components/OneFingerSinglePlayerContent';
+import { useGlobalSettings } from './GlobalSettings';
 
 const difficultyLevels = [
   { label: 'Easy', value: 'easy' as 'easy', reactionLimit: 500 },
@@ -12,6 +14,8 @@ const difficultyLevels = [
 
 export default function SinglePlayerGameScreen() {
   const router = useRouter();
+  const { settings } = useGlobalSettings();
+  const vibrationEnabled = settings.vibrationEnabled;
   const [gameState, setGameState] = useState('waiting'); // 'waiting', 'zap', 'game-over'
   const [fillTime, setFillTime] = useState(0); // Time until rectangle fills
   const [isFilled, setIsFilled] = useState(false); // Whether the rectangle is filled
@@ -64,6 +68,9 @@ export default function SinglePlayerGameScreen() {
       setIsFilled(true);
       startTimeRef.current = performance.now();
       setGameState('zap');
+      if (vibrationEnabled) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
 
       zapTimerRef.current = setTimeout(() => {
         if (gameStateRef.current === 'game-over') return; // Prevent state change if game is over

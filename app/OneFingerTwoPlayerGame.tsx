@@ -1,13 +1,17 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import TwoPlayerGameContent from '../components/OneFingerTwoPlayerContent';
+import { useGlobalSettings } from './GlobalSettings';
 
 
 type Player = 'p1' | 'p2';
 
 export default function TwoPlayerGameScreen() {
   const router = useRouter();
+  const { settings } = useGlobalSettings();
+  const vibrationEnabled = settings.vibrationEnabled;
 
   const [gameState, setGameState] = useState<
     'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over'
@@ -103,6 +107,9 @@ export default function TwoPlayerGameScreen() {
       setIsFilled(true);
       startTimeRef.current = performance.now();
       setGameState('zap');
+      if (vibrationEnabled) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
 
       zapTimeoutRef.current = setTimeout(() => {
         // if round already resolved, nothing to do

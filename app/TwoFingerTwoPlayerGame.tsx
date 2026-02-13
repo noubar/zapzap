@@ -1,8 +1,10 @@
 // TwoVsTwoGame.tsx
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import TwoVsTwoGameContent from '../components/TwoFingerTwoPlayerContent';
+import { useGlobalSettings } from './GlobalSettings';
 
 type Player = 'p1' | 'p2';
 type BoxIndex = 0 | 1;
@@ -11,6 +13,8 @@ type GameState = 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
 
 export default function TwoVsTwoGameScreen() {
   const router = useRouter();
+  const { settings } = useGlobalSettings();
+  const vibrationEnabled = settings.vibrationEnabled;
 
   const [gameState, setGameState] = useState<GameState>('idle');
 
@@ -171,6 +175,9 @@ export default function TwoVsTwoGameScreen() {
 
       startTimeRef.current = performance.now();
       setGameState('zap');
+      if (vibrationEnabled) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
 
       // After reaction limit, punish any player who has NOT released the correct finger yet.
       zapTimeoutRef.current = setTimeout(() => {

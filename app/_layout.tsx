@@ -2,6 +2,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { GlobalSettingsProvider } from './GlobalSettings';
 
 
 export default function RootLayout() {
@@ -15,12 +16,12 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GlobalSettingsProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="game" />
       </Stack>
       <StatusBar style="auto" />
-    </>
+    </GlobalSettingsProvider>
   );
 }

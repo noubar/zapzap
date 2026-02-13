@@ -1,10 +1,13 @@
 import { router } from 'expo-router';
-import { User, Users } from 'lucide-react-native';
+import { User, Users, Vibrate } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useGlobalSettings } from './GlobalSettings';
 
 export default function MenuScreen() {
   const [fingerMode, setFingerMode] = useState<1 | 2>(1);
+  const { settings, setSetting } = useGlobalSettings();
+  const vibrationEnabled = settings.vibrationEnabled;
 
   const menuOptions = useMemo(
     () => [
@@ -51,6 +54,19 @@ export default function MenuScreen() {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.vibrationToggle}
+        onPress={() => setSetting('vibrationEnabled', !vibrationEnabled)}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: vibrationEnabled }}
+      >
+        <Vibrate size={16} color={vibrationEnabled ? '#22c55e' : '#9ca3af'} />
+        <Text style={styles.vibrationLabel}>Vibration</Text>
+        <View style={styles.radioOuter}>
+          {vibrationEnabled ? <View style={styles.radioInner} /> : null}
+        </View>
+      </TouchableOpacity>
+
       <Text style={styles.title}>Zap Zap</Text>
       <Text style={styles.title}>A Reaction Game</Text>
       <Text style={styles.subtitle}>Choose Game Mode</Text>
@@ -126,6 +142,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  vibrationToggle: {
+    position: 'absolute',
+    top: 54,
+    right: 18,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  vibrationLabel: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: '#22c55e',
   },
   title: {
     fontSize: 36,

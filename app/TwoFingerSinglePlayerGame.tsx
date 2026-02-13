@@ -1,7 +1,9 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import TwoFingerSinglePlayerGameContent from '../components/TwoFingerSinglePlayerContent';
+import { useGlobalSettings } from './GlobalSettings';
 
 type Finger = 'left' | 'right';
 
@@ -13,6 +15,8 @@ const difficultyLevels = [
 
 export default function TwoFingerSinglePlayerGameScreen() {
   const router = useRouter();
+  const { settings } = useGlobalSettings();
+  const vibrationEnabled = settings.vibrationEnabled;
   const [gameState, setGameState] = useState<'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over'>('idle');
   const [filledFinger, setFilledFinger] = useState<Finger | null>(null);
   const [reactionTime, setReactionTime] = useState(0);
@@ -77,6 +81,9 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFilledFinger(nextTarget);
       startTimeRef.current = performance.now();
       setGameState('zap');
+      if (vibrationEnabled) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
 
       const reactionLimit = getReactionLimit();
       zapTimerRef.current = setTimeout(() => {
