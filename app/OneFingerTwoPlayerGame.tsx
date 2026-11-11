@@ -3,60 +3,63 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import TwoPlayerGameContent from '../components/OneFingerTwoPlayerContent';
+import OneFingerTwoPlayerContent from '../components/OneFingerTwoPlayerContent';
+import { createRandomWait, evaluateReaction, isHeldAfterInput } from '../gameplay/core';
 import {
-  compareReactionTimes,
-  createRandomWait,
-  evaluateReaction,
-  isHeldAfterInput,
-  recordPlayerReaction,
-} from '../gameplay/core';
+  applyRoundOutcome,
+  areBothPlayersReady,
+  createInitialMultiplayerState,
+  createSharedSignal,
+  getMatchWinner,
+  recordRoundResult,
+  settleCompletedRound,
+  settleSingleFailure,
+  type MultiplayerRoundOutcome,
+  type MultiplayerRoundResults,
+  type Player,
+  type RoundFailureReason,
+} from '../gameplay/multiplayer';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useGlobalSettings } from './GlobalSettings';
 
-type Player = 'p1' | 'p2';
 type GameState = 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
 
 const REACTION_DEADLINE_MS = 500;
+const RESULT_DISPLAY_MS = 1_000;
 
-export default function TwoPlayerGameScreen() {
+const playerLabel = (player: Player) => player === 'p1' ? 'Player 1' : 'Player 2';
+
+export default function OneFingerTwoPlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
+  const initialMatch = createInitialMultiplayerState();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isFilled, setIsFilled] = useState(false);
-  const [reactionTimes, setReactionTimes] = useState<{ p1: number | null; p2: number | null }>({
-    p1: null,
-    p2: null,
-  });
-  const [lives, setLives] = useState({ p1: 3, p2: 3 });
+  const [roundResults, setRoundResults] = useState(initialMatch.results);
+  const [lives, setLives] = useState(initialMatch.lives);
   const [roundWinner, setRoundWinner] = useState('');
   const [roundDetail, setRoundDetail] = useState('');
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ p1: false, p2: false });
 
   const timersRef = useRef(new RoundTimerManager());
-  const startTimeRef = useRef<number | null>(null);
+  const activeRoundIdRef = useRef<number | null>(null);
+  const signalTimeRef = useRef<number | null>(null);
   const touchHeldRef = useRef({ p1: false, p2: false });
-  const reactionTimesRef = useRef<{ p1: number | null; p2: number | null }>({
-    p1: null,
-    p2: null,
-  });
+  const roundResultsRef = useRef<MultiplayerRoundResults>(initialMatch.results);
   const gameStateRef = useRef<GameState>('idle');
   const roundResolvedRef = useRef(false);
 
   useEffect(() => () => timersRef.current.invalidate(), []);
 
   useEffect(() => {
-    if (lives.p1 <= 0 && lives.p2 > 0) {
-      setRoundWinner('Player 2');
-      updateGameState('game-over');
-    } else if (lives.p2 <= 0 && lives.p1 > 0) {
-      setRoundWinner('Player 1');
-      updateGameState('game-over');
-    } else if (lives.p1 <= 0 && lives.p2 <= 0) {
-      setRoundWinner('Draw');
-      updateGameState('game-over');
-    }
+    const winner = getMatchWinner(lives);
+    if (winner === null) return;
+    timersRef.current.invalidate();
+    activeRoundIdRef.current = null;
+    setRoundWinner(winner === 'draw' ? 'Draw' : playerLabel(winner));
+    setRoundDetail('MATCH COMPLETE');
+    updateGameState('game-over');
   }, [lives]);
 
   const updateGameState = (nextState: GameState) => {
@@ -69,19 +72,25 @@ export default function TwoPlayerGameScreen() {
     setHasTouchedToStart({ p1: false, p2: false });
   };
 
+  const replaceRoundResults = (results: MultiplayerRoundResults) => {
+    roundResultsRef.current = results;
+    setRoundResults(results);
+  };
+
   const resetGame = () => {
+    const nextMatch = createInitialMultiplayerState();
     timersRef.current.invalidate();
-    startTimeRef.current = null;
-    reactionTimesRef.current = { p1: null, p2: null };
+    activeRoundIdRef.current = null;
+    signalTimeRef.current = null;
     roundResolvedRef.current = false;
     resetReadiness();
-    updateGameState('idle');
+    replaceRoundResults(nextMatch.results);
+    setLives(nextMatch.lives);
     setIsFilled(false);
-    setReactionTimes({ p1: null, p2: null });
-    setLives({ p1: 3, p2: 3 });
     setRoundWinner('');
     setRoundDetail('');
     setBestReactionTime(null);
+    updateGameState('idle');
   };
 
   const finishRound = (roundId: number) => {
@@ -89,51 +98,82 @@ export default function TwoPlayerGameScreen() {
     setIsFilled(false);
     resetReadiness();
     timersRef.current.schedule(roundId, () => {
-      if (gameStateRef.current !== 'game-over') updateGameState('idle');
-    }, 1_000);
+      if (gameStateRef.current === 'game-over') return;
+      activeRoundIdRef.current = null;
+      signalTimeRef.current = null;
+      roundResolvedRef.current = false;
+      replaceRoundResults({ p1: null, p2: null });
+      setRoundWinner('');
+      setRoundDetail('');
+      updateGameState('idle');
+    }, RESULT_DISPLAY_MS);
   };
 
-  const resolveRound = (
-    roundId: number,
-    loser: Player | 'both' | 'none',
-    winnerLabel: string
-  ) => {
+  const settleOutcome = (roundId: number, outcome: MultiplayerRoundOutcome) => {
     if (roundResolvedRef.current || !timersRef.current.isCurrent(roundId)) return;
     roundResolvedRef.current = true;
-
-    if (loser === 'both') {
-      setLives((previous) => ({
-        p1: Math.max(0, previous.p1 - 1),
-        p2: Math.max(0, previous.p2 - 1),
-      }));
-    } else if (loser !== 'none') {
-      setLives((previous) => ({
-        ...previous,
-        [loser]: Math.max(0, previous[loser] - 1),
-      }));
-    }
-
-    setRoundWinner(winnerLabel);
+    setLives((previous) => applyRoundOutcome(previous, outcome));
+    setRoundWinner(outcome.winner === 'draw' ? 'Draw' : playerLabel(outcome.winner));
+    setRoundDetail({
+      'faster-reaction': 'FASTER REACTION',
+      'equal-reaction': 'TIED REACTION',
+      'single-failure': 'ROUND FORFEIT',
+      'both-failed': 'BOTH PLAYERS FAILED',
+    }[outcome.reason]);
     finishRound(roundId);
+  };
+
+  const recordValidReaction = (player: Player, reactionTime: number) => {
+    const results = recordRoundResult(
+      roundResultsRef.current,
+      player,
+      { kind: 'valid', reactionTime }
+    );
+    replaceRoundResults(results);
+    setBestReactionTime((previous) =>
+      previous === null ? reactionTime : Math.min(previous, reactionTime)
+    );
+    return results;
+  };
+
+  const recordFailureAndSettle = (player: Player, reason: RoundFailureReason) => {
+    const results = recordRoundResult(
+      roundResultsRef.current,
+      player,
+      { kind: 'invalid', reason }
+    );
+    if (results === roundResultsRef.current) return;
+    replaceRoundResults(results);
+
+    const settlementId = timersRef.current.beginRound();
+    activeRoundIdRef.current = settlementId;
+    timersRef.current.scheduleFrame(settlementId, () => {
+      const completedOutcome = settleCompletedRound(roundResultsRef.current);
+      settleOutcome(settlementId, completedOutcome ?? settleSingleFailure(player));
+    });
   };
 
   const beginWaitingForZap = () => {
     const roundId = timersRef.current.beginRound();
+    activeRoundIdRef.current = roundId;
     roundResolvedRef.current = false;
-    startTimeRef.current = null;
-    reactionTimesRef.current = { p1: null, p2: null };
-    setReactionTimes({ p1: null, p2: null });
+    signalTimeRef.current = null;
+    replaceRoundResults({ p1: null, p2: null });
     setRoundWinner('');
     setRoundDetail('');
     setIsFilled(false);
     updateGameState('waiting');
 
     timersRef.current.schedule(roundId, () => {
-      if (!touchHeldRef.current.p1 || !touchHeldRef.current.p2) return;
+      if (!areBothPlayersReady({
+        p1: [touchHeldRef.current.p1],
+        p2: [touchHeldRef.current.p2],
+      })) return;
 
       setIsFilled(true);
       timersRef.current.scheduleFrame(roundId, (frameTime) => {
-        startTimeRef.current = frameTime;
+        const signal = createSharedSignal(frameTime);
+        signalTimeRef.current = signal.signalTime;
         updateGameState('zap');
 
         if (settings.vibrationEnabled) {
@@ -142,20 +182,17 @@ export default function TwoPlayerGameScreen() {
 
         timersRef.current.schedule(roundId, () => {
           timersRef.current.scheduleFrame(roundId, () => {
-            if (gameStateRef.current !== 'zap') return;
-            const p1Valid = reactionTimesRef.current.p1 !== null;
-            const p2Valid = reactionTimesRef.current.p2 !== null;
-
-            if (!p1Valid && !p2Valid) {
-              setRoundDetail('TIMEOUT');
-              resolveRound(roundId, 'both', 'Both slow - draw');
-            } else if (!p1Valid) {
-              setRoundDetail('PLAYER 1 TOO SLOW');
-              resolveRound(roundId, 'p1', 'Player 2');
-            } else if (!p2Valid) {
-              setRoundDetail('PLAYER 2 TOO SLOW');
-              resolveRound(roundId, 'p2', 'Player 1');
+            if (gameStateRef.current !== 'zap' || roundResolvedRef.current) return;
+            let results = roundResultsRef.current;
+            if (results.p1 === null) {
+              results = recordRoundResult(results, 'p1', { kind: 'invalid', reason: 'timeout' });
             }
+            if (results.p2 === null) {
+              results = recordRoundResult(results, 'p2', { kind: 'invalid', reason: 'timeout' });
+            }
+            replaceRoundResults(results);
+            const outcome = settleCompletedRound(results);
+            if (outcome) settleOutcome(roundId, outcome);
           });
         }, REACTION_DEADLINE_MS);
       });
@@ -167,7 +204,10 @@ export default function TwoPlayerGameScreen() {
     touchHeldRef.current[player] = isHeldAfterInput('press');
     setHasTouchedToStart((previous) => ({ ...previous, [player]: true }));
 
-    if (touchHeldRef.current.p1 && touchHeldRef.current.p2) {
+    if (areBothPlayersReady({
+      p1: [touchHeldRef.current.p1],
+      p2: [touchHeldRef.current.p2],
+    })) {
       beginWaitingForZap();
     }
   };
@@ -177,74 +217,39 @@ export default function TwoPlayerGameScreen() {
     touchHeldRef.current[player] = isHeldAfterInput(cancelled ? 'cancel' : 'release');
     setHasTouchedToStart((previous) => ({ ...previous, [player]: false }));
 
-    if (stateAtRelease === 'idle' || stateAtRelease === 'round-result' || stateAtRelease === 'game-over') {
-      return;
-    }
+    if (stateAtRelease === 'idle' || stateAtRelease === 'round-result' || stateAtRelease === 'game-over') return;
+    if (roundResultsRef.current[player] !== null) return;
 
     if (stateAtRelease === 'waiting') {
-      setRoundDetail(cancelled ? 'HOLD INTERRUPTED' : 'FALSE START');
-      const roundId = timersRef.current.beginRound();
-      roundResolvedRef.current = false;
-      resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
+      recordFailureAndSettle(player, cancelled ? 'cancelled' : 'false-start');
       return;
     }
 
-    if (stateAtRelease !== 'zap' || startTimeRef.current === null) return;
-    if (reactionTimesRef.current[player] !== null) return;
-    const roundId = timersRef.current.beginRound();
+    if (stateAtRelease !== 'zap' || signalTimeRef.current === null) return;
+    if (cancelled) {
+      recordFailureAndSettle(player, 'cancelled');
+      return;
+    }
+
     const evaluation = evaluateReaction(
-      startTimeRef.current,
+      signalTimeRef.current,
       releaseTime,
       REACTION_DEADLINE_MS
     );
-
     if (evaluation.kind !== 'valid') {
-      setRoundDetail('TOO SLOW');
-      roundResolvedRef.current = false;
-      resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
+      recordFailureAndSettle(player, evaluation.kind === 'false-start' ? 'false-start' : 'late');
       return;
     }
 
-    reactionTimesRef.current = recordPlayerReaction(
-      reactionTimesRef.current,
-      player,
-      evaluation.reactionTime
-    );
-    setReactionTimes(reactionTimesRef.current);
-
-    const other: Player = player === 'p1' ? 'p2' : 'p1';
-    const otherTime = reactionTimesRef.current[other];
-    if (otherTime === null) {
-      timersRef.current.schedule(roundId, () => {
-        timersRef.current.scheduleFrame(roundId, () => {
-          if (gameStateRef.current === 'zap') {
-            resolveRound(roundId, other, player === 'p1' ? 'Player 1' : 'Player 2');
-          }
-        });
-      }, Math.max(0, REACTION_DEADLINE_MS - evaluation.reactionTime));
-      return;
-    }
-
-    const comparison = compareReactionTimes(evaluation.reactionTime, otherTime);
-    const fastest = Math.min(evaluation.reactionTime, otherTime);
-    setBestReactionTime((previous) => previous === null ? fastest : Math.min(previous, fastest));
-    roundResolvedRef.current = false;
-
-    if (comparison === 'draw') {
-      setRoundDetail('TIED REACTION');
-      resolveRound(roundId, 'none', 'Draw');
-    } else if (comparison === 'first') {
-      setRoundDetail('FASTER REACTION');
-      resolveRound(roundId, other, player === 'p1' ? 'Player 1' : 'Player 2');
-    } else {
-      setRoundDetail('FASTER REACTION');
-      resolveRound(roundId, player, other === 'p1' ? 'Player 1' : 'Player 2');
-    }
+    const results = recordValidReaction(player, evaluation.reactionTime);
+    const outcome = settleCompletedRound(results);
+    const roundId = activeRoundIdRef.current;
+    if (outcome && roundId !== null) settleOutcome(roundId, outcome);
   };
 
   return (
     <View style={styles.container}>
-      <TwoPlayerGameContent
+      <OneFingerTwoPlayerContent
         isFilled={isFilled}
         lives={lives}
         onPlayerPressIn={onPlayerPressIn}
@@ -252,7 +257,7 @@ export default function TwoPlayerGameScreen() {
         roundWinner={roundWinner}
         roundDetail={roundDetail}
         gameState={gameState}
-        reactionTime={reactionTimes}
+        roundResults={roundResults}
         bestReactionTime={bestReactionTime}
         resetGame={resetGame}
         router={router}
@@ -263,8 +268,5 @@ export default function TwoPlayerGameScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
+  container: { flex: 1, backgroundColor: 'black' },
 });

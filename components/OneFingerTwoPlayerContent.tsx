@@ -5,6 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import {
+  formatPlayerRoundResult,
+  type MultiplayerRoundResults,
+} from '../gameplay/multiplayer';
 import GameResultScreen from './GameResultScreen';
 
 type Player = 'p1' | 'p2';
@@ -17,7 +21,7 @@ interface OneFingerTwoPlayerContentProps {
   roundWinner: string;
   roundDetail: string;
   gameState: 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
-  reactionTime: { p1: number | null; p2: number | null };
+  roundResults: MultiplayerRoundResults;
   bestReactionTime: number | null;
   resetGame: () => void;
   router: Router;
@@ -26,7 +30,7 @@ interface OneFingerTwoPlayerContentProps {
 
 export default function OneFingerTwoPlayerContent({
   isFilled, lives, onPlayerPressIn, onPlayerPressOut, roundWinner, roundDetail,
-  gameState, reactionTime, bestReactionTime, resetGame, router, hasTouchedToStart,
+  gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart,
 }: OneFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
     const isDraw = roundWinner === 'Draw';
@@ -53,6 +57,11 @@ export default function OneFingerTwoPlayerContent({
     .onEnd((_, success) =>
       scheduleOnRN(onPlayerPressOut, player, performance.now(), !success)
     );
+  const player1Gesture = gestureFor('p1');
+  const player2Gesture = gestureFor('p2');
+  player1Gesture.simultaneousWithExternalGesture(player2Gesture);
+  player2Gesture.simultaneousWithExternalGesture(player1Gesture);
+  const playerGestures = { p1: player1Gesture, p2: player2Gesture };
 
   const status = gameState === 'round-result'
     ? roundWinner.toUpperCase()
@@ -66,8 +75,9 @@ export default function OneFingerTwoPlayerContent({
     const playerNumber = player === 'p1' ? 1 : 2;
     const playerWon = gameState === 'round-result' && roundWinner === `Player ${playerNumber}`;
     const draw = gameState === 'round-result' && (roundWinner === 'Draw' || roundWinner.includes('draw'));
+    const result = roundResults[player];
     return (
-      <GestureDetector gesture={gestureFor(player)}>
+      <GestureDetector gesture={playerGestures[player]}>
         <View
           accessible
           accessibilityRole="button"
@@ -91,8 +101,14 @@ export default function OneFingerTwoPlayerContent({
           <Text style={[styles.boxAction, isFilled && styles.boxActionSignal]}>
             {isFilled ? 'GO!' : playerWon ? 'ROUND WIN' : 'HOLD'}
           </Text>
-          {reactionTime[player] !== null && (
-            <Text style={styles.reactionText}>{formatReactionTime(reactionTime[player])}</Text>
+          {(result !== null || gameState === 'round-result') && (
+            <Text style={[
+              styles.reactionText,
+              result?.kind === 'invalid' && styles.failureText,
+              result === null && styles.noReleaseText,
+            ]}>
+              {formatPlayerRoundResult(result)}
+            </Text>
           )}
         </View>
       </GestureDetector>
@@ -138,6 +154,8 @@ const styles = StyleSheet.create({
   boxAction: { ...arcadeTypography.heading, marginTop: arcadeMetrics.spacing.sm },
   boxActionSignal: { color: arcadeColors.signalText },
   reactionText: { ...arcadeTypography.heading, color: arcadeColors.success, marginTop: 8, fontVariant: ['tabular-nums'] },
+  failureText: { color: arcadeColors.failure },
+  noReleaseText: { color: arcadeColors.textMuted, fontSize: 13 },
   centerStatus: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   status: { ...arcadeTypography.heading, position: 'absolute', top: '50%', textAlign: 'center' },
   statusTop: { ...arcadeTypography.heading, position: 'absolute', bottom: '50%', textAlign: 'center', transform: [{ rotate: '180deg' }] },
