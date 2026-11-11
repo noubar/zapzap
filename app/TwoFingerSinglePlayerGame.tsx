@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -18,6 +17,7 @@ import {
   type FakeSignalEvent,
 } from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { useFeedback } from '../feedback/FeedbackProvider';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -33,6 +33,7 @@ const difficultyLevels = DIFFICULTIES.map((value) => ({
 export default function TwoFingerSinglePlayerGameScreen() {
   const router = useRouter();
   const { settings, setSetting } = useGlobalSettings();
+  const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [filledFinger, setFilledFinger] = useState<Finger | null>(null);
   const [reactionTime, setReactionTime] = useState(0);
@@ -49,8 +50,12 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const touchHeldRef = useRef({ left: false, right: false });
   const gameStateRef = useRef<GameState>('idle');
   const roundFakeSignalsEnabledRef = useRef(false);
+  const feedbackSessionRef = useRef(0);
 
-  useEffect(() => () => timersRef.current.invalidate(), []);
+  useEffect(() => () => {
+    timersRef.current.invalidate();
+    cancelFeedback();
+  }, [cancelFeedback]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
@@ -59,6 +64,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
   const resetGame = () => {
     timersRef.current.invalidate();
+    cancelFeedback();
     updateGameState('idle');
     setFilledFinger(null);
     setReactionTime(0);
@@ -74,6 +80,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    feedbackSessionRef.current = beginFeedbackSession();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     const target = Math.random() < 0.5 ? 'left' : 'right';
@@ -109,9 +116,11 @@ export default function TwoFingerSinglePlayerGameScreen() {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        }
+        emitFeedback('go', {
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+          eventId: `${roundId}:go`,
+          session: feedbackSessionRef.current,
+        });
 
         timersRef.current.schedule(roundId, () => {
           timersRef.current.scheduleFrame(roundId, () => {
@@ -122,6 +131,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
             setFakeSignal(null);
             setHasTouchedToStart({ left: false, right: false });
             touchHeldRef.current = { left: false, right: false };
+            emitFeedback('timeout', { eventId: `${roundId}:timeout`, session: feedbackSessionRef.current });
           });
         }, roundDeadlineRef.current);
       });
@@ -156,6 +166,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       updateGameState('game-over');
       setFilledFinger(null);
       setFakeSignal(null);
+      emitFeedback('false-start', { eventId: `${feedbackSessionRef.current}:false-start`, session: feedbackSessionRef.current });
       return;
     }
 
@@ -168,6 +179,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       updateGameState('game-over');
       setFilledFinger(null);
       setFakeSignal(null);
+      emitFeedback('wrong-finger', { eventId: `${feedbackSessionRef.current}:wrong`, session: feedbackSessionRef.current });
       return;
     }
 
@@ -180,6 +192,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       updateGameState('game-over');
       setFilledFinger(null);
       setFakeSignal(null);
+      emitFeedback('timeout', { eventId: `${feedbackSessionRef.current}:late`, session: feedbackSessionRef.current });
       return;
     }
 
@@ -190,6 +203,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
     setFilledFinger(null);
     setFakeSignal(null);
     updateGameState('reaction-done');
+    emitFeedback('success', { eventId: `${feedbackSessionRef.current}:success`, session: feedbackSessionRef.current });
 
     const transitionId = timersRef.current.beginRound();
     timersRef.current.schedule(transitionId, () => {
@@ -217,6 +231,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
         levels={difficultyLevels}
         failureReason={failureReason}
         fakeSignal={fakeSignal}
+        visualEffectsEnabled={settings.visualEffectsEnabled}
       />
     </View>
   );

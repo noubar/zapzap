@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -12,6 +11,7 @@ import {
   type FakeSignalEvent,
 } from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { useFeedback } from '../feedback/FeedbackProvider';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -25,6 +25,7 @@ type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 export default function SinglePlayerGameScreen() {
   const router = useRouter();
   const { settings, setSetting } = useGlobalSettings();
+  const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isFilled, setIsFilled] = useState(false);
   const [reactionTime, setReactionTime] = useState(0);
@@ -40,8 +41,12 @@ export default function SinglePlayerGameScreen() {
   const touchHeldRef = useRef(false);
   const roundFakeSignalsEnabledRef = useRef(false);
   const gameStateRef = useRef<GameState>('idle');
+  const feedbackSessionRef = useRef(0);
 
-  useEffect(() => () => timersRef.current.invalidate(), []);
+  useEffect(() => () => {
+    timersRef.current.invalidate();
+    cancelFeedback();
+  }, [cancelFeedback]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
@@ -50,6 +55,7 @@ export default function SinglePlayerGameScreen() {
 
   const resetGame = () => {
     timersRef.current.invalidate();
+    cancelFeedback();
     startTimeRef.current = null;
     touchHeldRef.current = false;
     updateGameState('idle');
@@ -76,6 +82,7 @@ export default function SinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    feedbackSessionRef.current = beginFeedbackSession();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     updateGameState('waiting');
@@ -105,9 +112,11 @@ export default function SinglePlayerGameScreen() {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        }
+        emitFeedback('go', {
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+          eventId: `${roundId}:go`,
+          session: feedbackSessionRef.current,
+        });
 
         timersRef.current.schedule(roundId, () => {
           timersRef.current.scheduleFrame(roundId, () => {
@@ -118,6 +127,7 @@ export default function SinglePlayerGameScreen() {
             updateGameState('game-over');
             setIsFilled(false);
             setFakeSignal(null);
+            emitFeedback('timeout', { eventId: `${roundId}:timeout`, session: feedbackSessionRef.current });
           });
         }, roundDeadlineRef.current);
       });
@@ -144,6 +154,7 @@ export default function SinglePlayerGameScreen() {
       updateGameState('game-over');
       setIsFilled(false);
       setFakeSignal(null);
+      emitFeedback('false-start', { eventId: `${feedbackSessionRef.current}:false-start`, session: feedbackSessionRef.current });
       return;
     }
 
@@ -158,6 +169,7 @@ export default function SinglePlayerGameScreen() {
       updateGameState('game-over');
       setIsFilled(false);
       setFakeSignal(null);
+      emitFeedback('timeout', { eventId: `${feedbackSessionRef.current}:late`, session: feedbackSessionRef.current });
       return;
     }
 
@@ -167,6 +179,7 @@ export default function SinglePlayerGameScreen() {
     setBestReactionTime((previous) =>
       previous === null ? result.reactionTime : Math.min(previous, result.reactionTime)
     );
+    emitFeedback('success', { eventId: `${feedbackSessionRef.current}:success`, session: feedbackSessionRef.current });
     finishRound(transitionId);
   };
 
@@ -188,6 +201,7 @@ export default function SinglePlayerGameScreen() {
         levels={difficultyLevels}
         failureReason={failureReason}
         fakeSignal={fakeSignal}
+        visualEffectsEnabled={settings.visualEffectsEnabled}
       />
     </View>
   );

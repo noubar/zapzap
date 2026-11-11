@@ -96,6 +96,20 @@ test('fake signals can be enabled and persist through hydration', async () => {
   assert.equal(loaded.settings.fakeSignalsEnabled, true);
 });
 
+test('sound and visual effects preferences persist without changing other feedback settings', async () => {
+  const storage = new MemoryStorage();
+  const changed = {
+    ...DEFAULT_GAME_SETTINGS,
+    soundEnabled: false,
+    visualEffectsEnabled: false,
+  };
+  await persistGameSettings(storage, changed, null);
+  const loaded = await hydrateGameSettings(storage);
+  assert.equal(loaded.settings.soundEnabled, false);
+  assert.equal(loaded.settings.visualEffectsEnabled, false);
+  assert.equal(loaded.settings.hapticsEnabled, true);
+});
+
 test('changed settings persist once and unchanged settings do not rewrite', async () => {
   const storage = new MemoryStorage();
   const initial = serializeGameSettings(DEFAULT_GAME_SETTINGS);

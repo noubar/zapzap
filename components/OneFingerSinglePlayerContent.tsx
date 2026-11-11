@@ -14,6 +14,7 @@ import type { Difficulty } from '../settings/gameSettings';
 import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
+import ResultFeedbackView from './ResultFeedbackView';
 
 interface OneFingerSinglePlayerContentProps {
   isFilled: boolean;
@@ -31,6 +32,7 @@ interface OneFingerSinglePlayerContentProps {
   levels: { label: string; value: Difficulty }[];
   failureReason: string;
   fakeSignal: { color: FakeSignalColor; colorName: FakeSignalName } | null;
+  visualEffectsEnabled: boolean;
 }
 
 export default function SinglePlayerGameContent({
@@ -49,6 +51,7 @@ export default function SinglePlayerGameContent({
   levels,
   failureReason,
   fakeSignal,
+  visualEffectsEnabled,
 }: OneFingerSinglePlayerContentProps) {
   const holdGesture = Gesture.LongPress()
     .minDuration(0)
@@ -70,6 +73,7 @@ export default function SinglePlayerGameContent({
         ]}
         onPlayAgain={resetGame}
         onMainMenu={() => router.push('/')}
+        visualEffectsEnabled={visualEffectsEnabled}
       />
     );
   }
@@ -146,10 +150,10 @@ export default function SinglePlayerGameContent({
         </GestureDetector>
 
         {isSuccess && reactionTime > 0 && (
-          <View pointerEvents="none" style={styles.reactionOverlay}>
+          <ResultFeedbackView enabled={visualEffectsEnabled} kind="success" style={styles.reactionOverlay}>
             <Text style={styles.reactionLabel}>REACTION</Text>
             <Text style={styles.reactionTime}>{formatReactionTime(reactionTime)}</Text>
-          </View>
+          </ResultFeedbackView>
         )}
       </SafeAreaView>
     </GestureHandlerRootView>

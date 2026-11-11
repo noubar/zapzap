@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography } from '../constants/ArcadeTheme';
+import { useFeedback } from '../feedback/FeedbackProvider';
 import {
   DIFFICULTIES,
   DIFFICULTY_PROFILES,
@@ -42,9 +43,11 @@ function ToggleRow({ label, description, value, disabled = false, onValueChange 
 
 export default function GameOptionsScreen() {
   const { settings, setSetting, resetToDefaults } = useGlobalSettings();
+  const { emitFeedback } = useFeedback();
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
 
   const confirmReset = () => {
+    emitFeedback('menu');
     resetToDefaults();
     setIsConfirmingReset(false);
   };
@@ -66,7 +69,10 @@ export default function GameOptionsScreen() {
                 return (
                   <Pressable
                     key={difficulty}
-                    onPress={() => setSetting('difficulty', difficulty)}
+                    onPress={() => {
+                      emitFeedback('menu');
+                      setSetting('difficulty', difficulty);
+                    }}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selected }}
                     accessibilityLabel={`${profile.label}, ${profile.reactionDeadlineMs} milliseconds`}
@@ -95,7 +101,10 @@ export default function GameOptionsScreen() {
                 return (
                   <Pressable
                     key={format}
-                    onPress={() => setSetting('matchFormat', format)}
+                    onPress={() => {
+                      emitFeedback('menu');
+                      setSetting('matchFormat', format);
+                    }}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: selected }}
                     style={({ pressed }) => [styles.formatChoice, selected && styles.formatChoiceSelected, pressed && styles.pressed]}
@@ -112,23 +121,21 @@ export default function GameOptionsScreen() {
             <Text style={styles.sectionLabel}>FEEDBACK</Text>
             <ToggleRow
               label="Haptic Feedback"
-              description="Vibrate when the valid GO signal appears."
+              description="Use touch feedback for valid signals and round results."
               value={settings.hapticsEnabled}
               onValueChange={(value) => setSetting('hapticsEnabled', value)}
             />
             <ToggleRow
               label="Sound Effects"
-              description="Coming Soon — no sound system is installed."
+              description="Play short arcade cues for signals and results."
               value={settings.soundEnabled}
-              disabled
-              onValueChange={() => undefined}
+              onValueChange={(value) => setSetting('soundEnabled', value)}
             />
             <ToggleRow
               label="Visual Effects"
-              description="Coming Soon — essential gameplay feedback always remains visible."
+              description="Animate results while keeping essential feedback visible."
               value={settings.visualEffectsEnabled}
-              disabled
-              onValueChange={() => undefined}
+              onValueChange={(value) => setSetting('visualEffectsEnabled', value)}
             />
           </View>
 
@@ -168,7 +175,10 @@ export default function GameOptionsScreen() {
           </View>
 
           <Pressable
-            onPress={() => router.replace('/')}
+            onPress={() => {
+              emitFeedback('menu');
+              router.replace('/');
+            }}
             accessibilityRole="button"
             accessibilityLabel="Return to main menu"
             style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}

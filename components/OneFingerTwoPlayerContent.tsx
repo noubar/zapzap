@@ -13,6 +13,7 @@ import {
 } from '../gameplay/multiplayer';
 import { MATCH_FORMAT_LABELS, type MatchFormat } from '../settings/gameSettings';
 import GameResultScreen from './GameResultScreen';
+import ResultFeedbackView from './ResultFeedbackView';
 
 type Player = 'p1' | 'p2';
 
@@ -32,11 +33,13 @@ interface OneFingerTwoPlayerContentProps {
   router: Router;
   hasTouchedToStart: { p1: boolean; p2: boolean };
   fakeSignal: { color: FakeSignalColor; colorName: FakeSignalName } | null;
+  visualEffectsEnabled: boolean;
 }
 
 export default function OneFingerTwoPlayerContent({
   isFilled, lives, roundWins, matchFormat, onPlayerPressIn, onPlayerPressOut, roundWinner, roundDetail,
   gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart, fakeSignal,
+  visualEffectsEnabled,
 }: OneFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
     const isDraw = roundWinner === 'Draw';
@@ -53,6 +56,7 @@ export default function OneFingerTwoPlayerContent({
         ]}
         onPlayAgain={resetGame}
         onMainMenu={() => router.push('/')}
+        visualEffectsEnabled={visualEffectsEnabled}
       />
     );
   }
@@ -138,12 +142,16 @@ export default function OneFingerTwoPlayerContent({
     <GestureHandlerRootView style={styles.screen} onStartShouldSetResponder={() => true}>
       <SafeAreaView style={styles.playArea} edges={['top', 'bottom']}>
         {renderPlayer('p2', true)}
-        <View pointerEvents="none" style={styles.centerStatus}>
+        <ResultFeedbackView
+          enabled={visualEffectsEnabled && gameState === 'round-result'}
+          kind={roundWinner === 'Draw' ? 'draw' : 'success'}
+          style={styles.centerStatus}
+        >
           <Text accessibilityLiveRegion="polite" style={[styles.statusTop, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
           {roundDetail ? <Text style={styles.detailTop}>{roundDetail}</Text> : null}
           <Text accessibilityLiveRegion="polite" style={[styles.status, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
           {roundDetail ? <Text style={styles.detail}>{roundDetail}</Text> : null}
-        </View>
+        </ResultFeedbackView>
         {renderPlayer('p1', false)}
       </SafeAreaView>
     </GestureHandlerRootView>

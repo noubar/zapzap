@@ -9,6 +9,7 @@ import type { Difficulty } from '../settings/gameSettings';
 import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
+import ResultFeedbackView from './ResultFeedbackView';
 
 type Finger = 'left' | 'right';
 
@@ -32,12 +33,14 @@ interface TwoFingerSinglePlayerContentProps {
     colorName: FakeSignalName;
     target: Finger;
   } | null;
+  visualEffectsEnabled: boolean;
 }
 
 export default function TwoFingerSinglePlayerContent({
   filledFinger, onFingerPressIn, onFingerPressOut, gameState, reactionTime,
   bestReactionTime, resetGame, router, zapsAvoided, hasTouchedToStart,
   difficulty, setDifficulty, levels, failureReason, fakeSignal,
+  visualEffectsEnabled,
 }: TwoFingerSinglePlayerContentProps) {
   const hasBothTouched = hasTouchedToStart.left && hasTouchedToStart.right;
   const isSuccess = gameState === 'reaction-done';
@@ -54,6 +57,7 @@ export default function TwoFingerSinglePlayerContent({
         ]}
         onPlayAgain={resetGame}
         onMainMenu={() => router.push('/')}
+        visualEffectsEnabled={visualEffectsEnabled}
       />
     );
   }
@@ -132,10 +136,10 @@ export default function TwoFingerSinglePlayerContent({
         </View>
 
         {isSuccess && reactionTime > 0 && (
-          <View pointerEvents="none" style={styles.reactionOverlay}>
+          <ResultFeedbackView enabled={visualEffectsEnabled} kind="success" style={styles.reactionOverlay}>
             <Text style={styles.reactionLabel}>REACTION</Text>
             <Text style={styles.reactionTime}>{formatReactionTime(reactionTime)}</Text>
-          </View>
+          </ResultFeedbackView>
         )}
 
         <View style={styles.rectRow}>

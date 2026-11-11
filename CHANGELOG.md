@@ -6,6 +6,10 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- A centralized `expo-audio` feedback service, its SDK-compatible `expo-asset` peer, and nine original, locally generated arcade sound effects for GO, success, false starts, timeouts, wrong-finger releases, round wins, match wins, draws, and menu actions.
+- Shared sound and haptic feedback policies, session guards, duplicate-event protection, background audio deactivation, and failure-isolated playback cleanup.
+- Short result animations for successful reactions, failures, round outcomes, victories, and draws, with automatic reduced-motion support.
+- Deterministic feedback tests covering sound and haptic preferences, event mappings, Fake Signals fairness, multiplayer deduplication, stale-session cancellation, audio failures, cleanup, reduced motion, and preference persistence.
 - Optional Fake Signals across all four game variants, using randomized blue, purple, and amber flashes that must be ignored before the real white GO signal.
 - A lightweight deterministic fake-signal scheduler with randomized counts, colors, timing, duration, safety gaps, and round-generation cancellation.
 - Fake-signal regression coverage for scheduling geometry, color selection, false starts, target independence, multiplayer synchronization, stale callbacks, persistence, and consecutive rounds.
@@ -23,6 +27,12 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Sound Effects and Visual Effects are now active persistent Game Options instead of unavailable placeholders; resetting options restores both to their enabled defaults.
+- GO presentation remains the authoritative timing event: feedback is dispatched only after the existing frame timestamp is established and is never awaited by reaction measurement.
+- Haptic feedback now includes lightweight success, error, round, match, and menu mappings, including Android system haptic constants where available.
+- Fake Signals rounds suppress both GO audio and GO haptics while retaining post-evaluation outcome feedback.
+- Multiplayer uses one shared GO cue and one resolved round or match cue, preventing player-specific or duplicate pre-outcome feedback.
+- Optional visual motion is disabled when Visual Effects is off or the operating system requests reduced motion; essential labels, reaction times, and outcome colors remain visible.
 - The persistent Fake Signals option is now enabled in Game Options and described as “Ignore colored flashes. Release only on white.”
 - Fake-enabled rounds suppress signal haptics so the genuine white signal has no unique nonvisual cue; existing GO haptics remain unchanged when Fake Signals is off.
 - Two-player fake flashes share one schedule and color, while two-finger variants independently randomize which button flashes without influencing the genuine targets.
@@ -43,6 +53,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Audio preparation, seeking, playback, haptic failures, stale callbacks, and cleanup errors cannot interrupt gameplay or mutate round results.
+- Rapid replay, reset, navigation, and app backgrounding invalidate pending feedback and stop reusable players without allocating new players during rounds.
 - Fake flashes remain presentation-only waiting states: they never create a reaction timestamp, deadline, score, life penalty, or valid release path.
 - Fake callbacks are cancelled with the owning round and cannot outlive reset, failure, success, timeout, match completion, or navigation cleanup.
 - Settings hydration cannot overwrite saved preferences with defaults before the initial storage read completes, and unchanged values do not trigger redundant writes.
@@ -62,7 +74,7 @@ All notable changes to this project are documented in this file.
 
 ### Known Limitations
 
-- Sound playback and optional decorative visual effects remain unavailable and are labeled Coming Soon in Game Options.
+- Actual speaker latency, silent-switch behavior, perceived volume, Android/iOS haptic character, and animation smoothness still require physical-device verification.
 - Fake-signal flash perception and cancellation during operating-system interruptions still require physical Android and iOS verification.
 - Four-finger gesture recognition and near-simultaneous native release delivery still require physical Android and iOS device testing.
 - Automated browser viewport inspection was unavailable in this environment; responsive appearance, multi-touch feel, haptics, and safe-area behavior still require phone/tablet and physical Android/iOS verification.

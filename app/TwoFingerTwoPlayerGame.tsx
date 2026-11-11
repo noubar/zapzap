@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -29,6 +28,8 @@ import {
   type RoundFailureReason,
 } from '../gameplay/multiplayer';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { useFeedback } from '../feedback/FeedbackProvider';
+import type { FeedbackEvent } from '../feedback/feedbackPolicy';
 import { getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -45,6 +46,7 @@ const playerLabel = (player: Player) => player === 'p1' ? 'Player 1' : 'Player 2
 export default function TwoFingerTwoPlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
+  const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
   const initialMatch = createInitialMultiplayerState();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [targets, setTargets] = useState<{ p1: BoxIndex | null; p2: BoxIndex | null }>({ p1: null, p2: null });
@@ -73,8 +75,18 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const gameStateRef = useRef<GameState>('idle');
   const roundResolvedRef = useRef(false);
   const roundFakeSignalsEnabledRef = useRef(false);
+  const feedbackSessionRef = useRef(0);
+  const outcomeFeedbackRef = useRef<FeedbackEvent>('round-won');
+  const matchScoreRef = useRef<MultiplayerMatchScore>({
+    lives: initialMatch.lives,
+    roundWins: initialMatch.roundWins,
+    roundsPlayed: initialMatch.roundsPlayed,
+  });
 
-  useEffect(() => () => timersRef.current.invalidate(), []);
+  useEffect(() => () => {
+    timersRef.current.invalidate();
+    cancelFeedback();
+  }, [cancelFeedback]);
 
   useEffect(() => {
     const winner = getConfiguredMatchWinner(matchScore, matchFormatRef.current);
@@ -116,11 +128,13 @@ export default function TwoFingerTwoPlayerGameScreen() {
     replaceTargets({ p1: null, p2: null });
     replaceRoundResults(nextMatch.results);
     matchFormatRef.current = settings.matchFormat;
-    setMatchScore({
+    const resetScore = {
       lives: nextMatch.lives,
       roundWins: nextMatch.roundWins,
       roundsPlayed: nextMatch.roundsPlayed,
-    });
+    };
+    matchScoreRef.current = resetScore;
+    setMatchScore(resetScore);
     setRoundWinner('');
     setRoundDetail('');
     setBestReactionTime(null);
@@ -148,7 +162,21 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const settleOutcome = (roundId: number, outcome: MultiplayerRoundOutcome) => {
     if (roundResolvedRef.current || !timersRef.current.isCurrent(roundId)) return;
     roundResolvedRef.current = true;
-    setMatchScore((previous) => applyMatchOutcome(previous, matchFormatRef.current, outcome));
+    const nextScore = applyMatchOutcome(matchScoreRef.current, matchFormatRef.current, outcome);
+    matchScoreRef.current = nextScore;
+    setMatchScore(nextScore);
+    const matchWinner = getConfiguredMatchWinner(nextScore, matchFormatRef.current);
+    const feedbackEvent = matchWinner === 'draw'
+      ? 'match-draw'
+      : matchWinner === 'p1' || matchWinner === 'p2'
+        ? 'match-won'
+        : outcome.winner === 'draw'
+          ? 'match-draw'
+          : outcomeFeedbackRef.current;
+    emitFeedback(feedbackEvent, {
+      eventId: `${feedbackSessionRef.current}:outcome`,
+      session: feedbackSessionRef.current,
+    });
     setRoundWinner(outcome.winner === 'draw' ? 'Draw' : playerLabel(outcome.winner));
     setRoundDetail({
       'faster-reaction': 'FASTER REACTION',
@@ -179,6 +207,11 @@ export default function TwoFingerTwoPlayerGameScreen() {
       { kind: 'invalid', reason }
     );
     if (results === roundResultsRef.current) return;
+    outcomeFeedbackRef.current = reason === 'timeout' || reason === 'late'
+      ? 'timeout'
+      : reason === 'wrong-finger'
+        ? 'wrong-finger'
+        : 'false-start';
     replaceRoundResults(results);
     setFakeSignal(null);
 
@@ -192,6 +225,8 @@ export default function TwoFingerTwoPlayerGameScreen() {
 
   const beginWaitingForZap = () => {
     const roundId = timersRef.current.beginRound();
+    feedbackSessionRef.current = beginFeedbackSession();
+    outcomeFeedbackRef.current = 'round-won';
     activeRoundIdRef.current = roundId;
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
@@ -233,9 +268,11 @@ export default function TwoFingerTwoPlayerGameScreen() {
         signalTimeRef.current = signal.signalTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-        }
+        emitFeedback('go', {
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+          eventId: `${roundId}:go`,
+          session: feedbackSessionRef.current,
+        });
 
         timersRef.current.schedule(roundId, () => {
           timersRef.current.scheduleFrame(roundId, () => {
@@ -248,6 +285,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
               results = recordRoundResult(results, 'p2', { kind: 'invalid', reason: 'timeout' });
             }
             replaceRoundResults(results);
+            outcomeFeedbackRef.current = 'timeout';
             const outcome = settleCompletedRound(results);
             if (outcome) settleOutcome(roundId, outcome);
           });
@@ -328,6 +366,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
         router={router}
         hasTouchedToStart={hasTouchedToStart}
         fakeSignal={fakeSignal}
+        visualEffectsEnabled={settings.visualEffectsEnabled}
       />
     </View>
   );

@@ -6,6 +6,7 @@ import {
   arcadeMetrics,
   arcadeTypography,
 } from '../constants/ArcadeTheme';
+import ResultFeedbackView from './ResultFeedbackView';
 
 type ResultTone = 'failure' | 'victory' | 'draw';
 
@@ -22,6 +23,7 @@ type GameResultScreenProps = {
   stats: ResultStat[];
   onPlayAgain: () => void;
   onMainMenu: () => void;
+  visualEffectsEnabled: boolean;
 };
 
 const toneColors: Record<ResultTone, string> = {
@@ -43,6 +45,7 @@ export default function GameResultScreen({
   stats,
   onPlayAgain,
   onMainMenu,
+  visualEffectsEnabled,
 }: GameResultScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -51,12 +54,14 @@ export default function GameResultScreen({
         showsVerticalScrollIndicator={false}
       >
         <Text style={arcadeTypography.eyebrow}>ZAPZAP // RESULT</Text>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: toneColors[tone] }]}
-        >
-          {title}
-        </Text>
+        <ResultFeedbackView enabled={visualEffectsEnabled} kind={tone}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.title, { color: toneColors[tone] }]}
+          >
+            {title}
+          </Text>
+        </ResultFeedbackView>
         <Text style={styles.message}>{message}</Text>
 
         <View style={styles.stats}>
