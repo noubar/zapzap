@@ -4,127 +4,138 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import SinglePlayerGameContent from '../components/OneFingerSinglePlayerContent';
+import { createRandomWait, evaluateReaction, isHeldAfterInput } from '../gameplay/core';
+import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useGlobalSettings } from './GlobalSettings';
 
 const difficultyLevels = [
-  { label: 'Easy', value: 'easy' as 'easy', reactionLimit: 500 },
-  { label: 'Medium', value: 'medium' as 'medium', reactionLimit: 350 },
-  { label: 'Hard', value: 'hard' as 'hard', reactionLimit: 250 },
+  { label: 'Easy', value: 'easy' as const, reactionLimit: 500 },
+  { label: 'Medium', value: 'medium' as const, reactionLimit: 350 },
+  { label: 'Hard', value: 'hard' as const, reactionLimit: 250 },
 ];
+
+type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 
 export default function SinglePlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
-  const vibrationEnabled = settings.vibrationEnabled;
-  const [gameState, setGameState] = useState('waiting'); // 'waiting', 'zap', 'game-over'
-  const [fillTime, setFillTime] = useState(0); // Time until rectangle fills
-  const [isFilled, setIsFilled] = useState(false); // Whether the rectangle is filled
-  const [reactionTime, setReactionTime] = useState(0); // Players react time in ms
-  const [zapesAvoided, setZapesAvoided] = useState(0); // Number of successful zapes avoided
+  const [gameState, setGameState] = useState<GameState>('idle');
+  const [isFilled, setIsFilled] = useState(false);
+  const [reactionTime, setReactionTime] = useState(0);
+  const [zapesAvoided, setZapesAvoided] = useState(0);
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
-  const [hasTouchedToStart, setHasTouchedToStart] = useState(false); // Players first touch to start
+  const [hasTouchedToStart, setHasTouchedToStart] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
 
-  const timerRef = useRef<number | null>(null); // Timer for filling the rectangle
-  const zapTimerRef = useRef<number | null>(null); // Timer for raction timeout
-  const startTimeRef = useRef(0); // Stores the timestamp of "zap"
-  const touchHeldRef = useRef({ p1: false }); // Whether player is currently touching
-  const releaseTimeRef = useRef({ p1: 0 }); // Time when player last released
-  const gameStateRef = useRef(gameState); // To access latest gameState in async callbacks
+  const timersRef = useRef(new RoundTimerManager());
+  const startTimeRef = useRef<number | null>(null);
+  const touchHeldRef = useRef(false);
+  const gameStateRef = useRef<GameState>('idle');
 
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
-    };
-  }, []);
-  // Keep gameStateRef in sync
-  useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
-  
+  useEffect(() => () => timersRef.current.invalidate(), []);
+
+  const updateGameState = (nextState: GameState) => {
+    gameStateRef.current = nextState;
+    setGameState(nextState);
+  };
+
+  const getReactionLimit = () =>
+    difficultyLevels.find((level) => level.value === difficulty)?.reactionLimit ?? 500;
+
   const resetGame = () => {
-    setGameState('waiting');
+    timersRef.current.invalidate();
+    startTimeRef.current = null;
+    touchHeldRef.current = false;
+    updateGameState('idle');
     setIsFilled(false);
     setReactionTime(0);
     setHasTouchedToStart(false);
     setZapesAvoided(0);
+    setBestReactionTime(null);
   };
 
-  const getRandomTime = () => Math.random() * 4000 + 1000; // 1 to 5 seconds
+  const finishRound = (roundId: number) => {
+    updateGameState('reaction-done');
+    setIsFilled(false);
+    setHasTouchedToStart(false);
+
+    timersRef.current.schedule(roundId, () => {
+      startTimeRef.current = null;
+      updateGameState('idle');
+    }, 1_000);
+  };
 
   const startRound = () => {
-    setGameState('waiting');
+    const roundId = timersRef.current.beginRound();
+    updateGameState('waiting');
     setIsFilled(false);
     setReactionTime(0);
-    touchHeldRef.current = { p1: false };
-    releaseTimeRef.current = { p1: 0 };
-    const newFillTime = getRandomTime();
-    setFillTime(newFillTime);
+    startTimeRef.current = null;
 
-    timerRef.current = setTimeout(() => {
-      if (gameStateRef.current === 'game-over') return; // Prevent starting round if game is over
+    timersRef.current.schedule(roundId, () => {
+      if (!touchHeldRef.current) return;
+
       setIsFilled(true);
-      startTimeRef.current = performance.now();
-      setGameState('zap');
-      if (vibrationEnabled) {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
+      timersRef.current.scheduleFrame(roundId, (frameTime) => {
+        startTimeRef.current = frameTime;
+        updateGameState('zap');
 
-      zapTimerRef.current = setTimeout(() => {
-        if (gameStateRef.current === 'game-over') return; // Prevent state change if game is over
-        if (touchHeldRef.current.p1) {
-          setGameState('game-over');
+        if (settings.vibrationEnabled) {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
-      }, 1000);
-    }, newFillTime);
-  };
 
-  const getReactionLimit = () => {
-    const level = difficultyLevels.find(d => d.value === difficulty);
-    return level ? level.reactionLimit : 500;
+        timersRef.current.schedule(roundId, () => {
+          timersRef.current.scheduleFrame(roundId, () => {
+            if (gameStateRef.current !== 'zap') return;
+            touchHeldRef.current = false;
+            setHasTouchedToStart(false);
+            updateGameState('game-over');
+            setIsFilled(false);
+          });
+        }, getReactionLimit());
+      });
+    }, createRandomWait());
   };
 
   const handlePressIn = () => {
-    if (gameState === 'waiting') {
-      touchHeldRef.current['p1'] = true;
-      setHasTouchedToStart(true);
-      startRound();
-    }
+    if (gameStateRef.current !== 'idle') return;
+    touchHeldRef.current = isHeldAfterInput('press');
+    setHasTouchedToStart(true);
+    startRound();
   };
 
-  const handlePressOut = () => {
-    if (gameState === 'zap') {
-      if (zapTimerRef.current) {
-        clearTimeout(zapTimerRef.current);
-        zapTimerRef.current = null;
-      }
-      const endTime = performance.now();
-      const timeDiff = endTime - startTimeRef.current;
-      setReactionTime(timeDiff);
+  const handlePressOut = (releaseTime: number, cancelled: boolean) => {
+    const stateAtRelease = gameStateRef.current;
+    touchHeldRef.current = isHeldAfterInput(cancelled ? 'cancel' : 'release');
+    setHasTouchedToStart(false);
 
-      const reactionLimit = getReactionLimit();
-      if (timeDiff > reactionLimit) {
-        setGameState('game-over');
-      } 
-      else {
-        setZapesAvoided(prev => prev + 1);
-        setGameState('reaction-done');
-        setBestReactionTime(prev => (prev === null ? timeDiff : Math.min(prev, timeDiff)));
-        setTimeout(() => {
-          if (gameStateRef.current !== 'game-over') startRound();
-        }, 1000);
-      }
-    } 
-    else if (gameState === 'waiting') {
-      setGameState('game-over');
+    if (stateAtRelease === 'waiting') {
+      timersRef.current.invalidate();
+      updateGameState('game-over');
+      setIsFilled(false);
+      return;
     }
-    touchHeldRef.current['p1'] = false; // Player released
-    releaseTimeRef.current['p1'] = performance.now(); // Record release time
-  };
 
-  
+    if (stateAtRelease !== 'zap' || startTimeRef.current === null) return;
+
+    const result = evaluateReaction(startTimeRef.current, releaseTime, getReactionLimit());
+    setReactionTime(Math.max(0, result.reactionTime));
+
+    if (result.kind !== 'valid') {
+      timersRef.current.invalidate();
+      updateGameState('game-over');
+      setIsFilled(false);
+      return;
+    }
+
+    timersRef.current.invalidate();
+    const transitionId = timersRef.current.beginRound();
+    setZapesAvoided((previous) => previous + 1);
+    setBestReactionTime((previous) =>
+      previous === null ? result.reactionTime : Math.min(previous, result.reactionTime)
+    );
+    finishRound(transitionId);
+  };
 
   return (
     <View style={styles.container}>

@@ -17,6 +17,7 @@ export default function SinglePlayerTutorialAnimation() {
   const fillProgress = useRef(new Animated.Value(0)).current;
   const zapOpacity = useRef(new Animated.Value(0)).current;
   const hintOpacity = useRef(new Animated.Value(0)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const fingerTranslate = fingerProgress.interpolate({
     inputRange: [-1, 0, 1],
@@ -37,7 +38,7 @@ export default function SinglePlayerTutorialAnimation() {
       zapOpacity.setValue(0);
       hintOpacity.setValue(0);
 
-      Animated.sequence([
+      animationRef.current = Animated.sequence([
         Animated.timing(fingerProgress, {
           toValue: 1,
           duration: 650,
@@ -77,24 +78,31 @@ export default function SinglePlayerTutorialAnimation() {
           }),
         ]),
         Animated.delay(700),
-      ]).start();
+      ]);
+      animationRef.current.start();
     };
 
     animate();
     const interval = setInterval(animate, CYCLE_DURATION_MS);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      animationRef.current?.stop();
+    };
   }, [fingerProgress, fillProgress, hintOpacity, zapOpacity]);
 
   useEffect(() => {
-    const timeouts = STEP_TIMINGS_MS.map((timing, index) =>
-      setTimeout(() => setStepIndex(index), timing),
-    );
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const scheduleSteps = () => {
+      STEP_TIMINGS_MS.forEach((timing, index) => {
+        timeouts.push(setTimeout(() => setStepIndex(index), timing));
+      });
+    };
+
+    scheduleSteps();
 
     const interval = setInterval(() => {
-      STEP_TIMINGS_MS.forEach((timing, index) => {
-        setTimeout(() => setStepIndex(index), timing);
-      });
+      scheduleSteps();
     }, CYCLE_DURATION_MS);
 
     return () => {

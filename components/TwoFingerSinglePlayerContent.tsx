@@ -9,7 +9,7 @@ type Finger = 'left' | 'right';
 interface TwoFingerSinglePlayerContent {
   filledFinger: Finger | null;
   onFingerPressIn: (finger: Finger) => void;
-  onFingerPressOut: (finger: Finger) => void;
+  onFingerPressOut: (finger: Finger, releaseTime: number, cancelled: boolean) => void;
   gameState: string;
   reactionTime: number;
   bestReactionTime: number | null;
@@ -79,8 +79,11 @@ export default function TwoFingerSinglePlayerContent(
         <GestureDetector
           gesture={Gesture.LongPress()
             .minDuration(0)
+            .shouldCancelWhenOutside(false)
             .onStart(() => scheduleOnRN(onFingerPressIn, 'left'))
-            .onEnd(() => scheduleOnRN(onFingerPressOut, 'left'))}
+            .onEnd((_, success) =>
+              scheduleOnRN(onFingerPressOut, 'left', performance.now(), !success)
+            )}
         >
           <View style={[styles.rectangle, filledFinger === 'left' && styles.filled]}>
             <Text style={[styles.fingerLabel, filledFinger === 'left' && styles.fingerLabelFilled]}>
@@ -92,8 +95,11 @@ export default function TwoFingerSinglePlayerContent(
         <GestureDetector
           gesture={Gesture.LongPress()
             .minDuration(0)
+            .shouldCancelWhenOutside(false)
             .onStart(() => scheduleOnRN(onFingerPressIn, 'right'))
-            .onEnd(() => scheduleOnRN(onFingerPressOut, 'right'))}
+            .onEnd((_, success) =>
+              scheduleOnRN(onFingerPressOut, 'right', performance.now(), !success)
+            )}
         >
           <View style={[styles.rectangle, filledFinger === 'right' && styles.filled]}>
             <Text style={[styles.fingerLabel, filledFinger === 'right' && styles.fingerLabelFilled]}>

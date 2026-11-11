@@ -11,7 +11,7 @@ interface TwoFingerTwoPlayerContent {
   targets: { p1: number | null; p2: number | null };
   lives: { p1: number; p2: number };
   onBoxPressIn: (player: Player, index: BoxIndex) => void;
-  onBoxPressOut: (player: Player, index: BoxIndex) => void;
+  onBoxPressOut: (player: Player, index: BoxIndex, releaseTime: number, cancelled: boolean) => void;
   roundWinner: string;
   gameState: 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
   reactionTimes: { p1: number | null; p2: number | null };
@@ -68,8 +68,11 @@ export default function TwoVsTwoGameContent(props: TwoFingerTwoPlayerContent) {
 
     const gesture = Gesture.LongPress()
       .minDuration(0)
+      .shouldCancelWhenOutside(false)
       .onStart(() => scheduleOnRN(onBoxPressIn, player, index))
-      .onEnd(() => scheduleOnRN(onBoxPressOut, player, index));
+      .onEnd((_, success) =>
+        scheduleOnRN(onBoxPressOut, player, index, performance.now(), !success)
+      );
 
     return (
       <GestureDetector gesture={gesture} key={`${player}-${index}`}>

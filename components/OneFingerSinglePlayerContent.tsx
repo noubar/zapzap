@@ -1,11 +1,13 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { scheduleOnRN } from 'react-native-worklets';
 import DifficultySelector from './DifficultySelector';
 
 interface OneFingerSinglePlayerContent {
     isFilled: boolean;
     handlePressIn: () => void;
-    handlePressOut: () => void;
+    handlePressOut: (releaseTime: number, cancelled: boolean) => void;
     gameState: string;
     reactionTime: number;
     bestReactionTime: number | null;
@@ -35,6 +37,14 @@ export default function SinglePlayerGameContent(props: OneFingerSinglePlayerCont
     levels: difficultyLevels,
   } = props;
 
+  const holdGesture = Gesture.LongPress()
+    .minDuration(0)
+    .shouldCancelWhenOutside(false)
+    .onStart(() => scheduleOnRN(handlePressIn))
+    .onEnd((_, success) => {
+      scheduleOnRN(handlePressOut, performance.now(), !success);
+    });
+
   if (gameState === 'game-over') {
     return (
       <View style={styles.resultContainer}>
@@ -52,7 +62,7 @@ export default function SinglePlayerGameContent(props: OneFingerSinglePlayerCont
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={styles.screen}>
     <Text style={styles.statusText}>{hasTouchedToStart ? 'WAITING' : 'TOUCH TO START'}</Text>
     <DifficultySelector
         difficulty={difficulty}
@@ -60,13 +70,11 @@ export default function SinglePlayerGameContent(props: OneFingerSinglePlayerCont
         hasTouchedToStart={hasTouchedToStart}
         levels={difficultyLevels}
         />
-      <View style={[styles.rectangle, isFilled && styles.filled]}>
-        <Pressable
-          style={styles.fullSize}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-        />
-      </View>
+      <GestureDetector gesture={holdGesture}>
+        <View style={[styles.rectangle, isFilled && styles.filled]}>
+          <View style={styles.fullSize} />
+        </View>
+      </GestureDetector>
       {reactionTime > 0 && (
         <View style={styles.overlay}>
           <Text style={styles.overlayText}>{reactionTime.toFixed(2)} ms</Text>
@@ -82,11 +90,17 @@ export default function SinglePlayerGameContent(props: OneFingerSinglePlayerCont
           Best Reaction: {bestReactionTime !== null ? bestReactionTime.toFixed(2) + ' ms' : '---'}
         </Text>
       </View>
-    </>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rectangle: {
     width: '90%',
     height: '40%',

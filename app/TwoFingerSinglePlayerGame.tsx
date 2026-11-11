@@ -2,10 +2,19 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+
 import TwoFingerSinglePlayerGameContent from '../components/TwoFingerSinglePlayerContent';
+import {
+  createRandomWait,
+  evaluateReaction,
+  isCorrectTarget,
+  isHeldAfterInput,
+} from '../gameplay/core';
+import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useGlobalSettings } from './GlobalSettings';
 
 type Finger = 'left' | 'right';
+type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 
 const difficultyLevels = [
   { label: 'Easy', value: 'easy' as const, reactionLimit: 500 },
@@ -16,8 +25,7 @@ const difficultyLevels = [
 export default function TwoFingerSinglePlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
-  const vibrationEnabled = settings.vibrationEnabled;
-  const [gameState, setGameState] = useState<'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over'>('idle');
+  const [gameState, setGameState] = useState<GameState>('idle');
   const [filledFinger, setFilledFinger] = useState<Finger | null>(null);
   const [reactionTime, setReactionTime] = useState(0);
   const [zapsAvoided, setZapsAvoided] = useState(0);
@@ -25,28 +33,25 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ left: false, right: false });
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
 
-  const timerRef = useRef<number | null>(null);
-  const zapTimerRef = useRef<number | null>(null);
-  const startTimeRef = useRef(0);
+  const timersRef = useRef(new RoundTimerManager());
+  const startTimeRef = useRef<number | null>(null);
   const targetFingerRef = useRef<Finger | null>(null);
   const touchHeldRef = useRef({ left: false, right: false });
-  const gameStateRef = useRef(gameState);
+  const gameStateRef = useRef<GameState>('idle');
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
-    };
-  }, []);
+  useEffect(() => () => timersRef.current.invalidate(), []);
 
-  useEffect(() => {
-    gameStateRef.current = gameState;
-  }, [gameState]);
+  const updateGameState = (nextState: GameState) => {
+    gameStateRef.current = nextState;
+    setGameState(nextState);
+  };
+
+  const getReactionLimit = () =>
+    difficultyLevels.find((level) => level.value === difficulty)?.reactionLimit ?? 500;
 
   const resetGame = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
-    setGameState('idle');
+    timersRef.current.invalidate();
+    updateGameState('idle');
     setFilledFinger(null);
     setReactionTime(0);
     setZapsAvoided(0);
@@ -54,50 +59,46 @@ export default function TwoFingerSinglePlayerGameScreen() {
     setHasTouchedToStart({ left: false, right: false });
     touchHeldRef.current = { left: false, right: false };
     targetFingerRef.current = null;
+    startTimeRef.current = null;
   };
-
-  const getRandomTime = () => Math.random() * 4000 + 1000;
-
-  const getReactionLimit = () => {
-    const level = difficultyLevels.find((d) => d.value === difficulty);
-    return level ? level.reactionLimit : 500;
-  };
-
-  const pickTargetFinger = (): Finger => (Math.random() < 0.5 ? 'left' : 'right');
 
   const startRound = () => {
-    setGameState('waiting');
+    const roundId = timersRef.current.beginRound();
+    const target = Math.random() < 0.5 ? 'left' : 'right';
+    targetFingerRef.current = target;
+    startTimeRef.current = null;
+    updateGameState('waiting');
     setFilledFinger(null);
     setReactionTime(0);
-    const nextTarget = pickTargetFinger();
-    targetFingerRef.current = nextTarget;
 
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
+    timersRef.current.schedule(roundId, () => {
+      if (!touchHeldRef.current.left || !touchHeldRef.current.right) return;
 
-    const newFillTime = getRandomTime();
-    timerRef.current = setTimeout(() => {
-      if (gameStateRef.current === 'game-over') return;
-      setFilledFinger(nextTarget);
-      startTimeRef.current = performance.now();
-      setGameState('zap');
-      if (vibrationEnabled) {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      }
+      setFilledFinger(target);
+      timersRef.current.scheduleFrame(roundId, (frameTime) => {
+        startTimeRef.current = frameTime;
+        updateGameState('zap');
 
-      const reactionLimit = getReactionLimit();
-      zapTimerRef.current = setTimeout(() => {
-        if (gameStateRef.current !== 'zap') return;
-        if (targetFingerRef.current && touchHeldRef.current[targetFingerRef.current]) {
-          setGameState('game-over');
+        if (settings.vibrationEnabled) {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
-      }, reactionLimit);
-    }, newFillTime);
+
+        timersRef.current.schedule(roundId, () => {
+          timersRef.current.scheduleFrame(roundId, () => {
+            if (gameStateRef.current !== 'zap') return;
+            updateGameState('game-over');
+            setFilledFinger(null);
+            setHasTouchedToStart({ left: false, right: false });
+            touchHeldRef.current = { left: false, right: false };
+          });
+        }, getReactionLimit());
+      });
+    }, createRandomWait());
   };
 
   const handlePressIn = (finger: Finger) => {
-    touchHeldRef.current[finger] = true;
-    setHasTouchedToStart((prev) => ({ ...prev, [finger]: true }));
+    touchHeldRef.current[finger] = isHeldAfterInput('press');
+    setHasTouchedToStart((previous) => ({ ...previous, [finger]: true }));
 
     if (
       gameStateRef.current === 'idle' &&
@@ -108,59 +109,53 @@ export default function TwoFingerSinglePlayerGameScreen() {
     }
   };
 
-  const handlePressOut = (finger: Finger) => {
-    touchHeldRef.current[finger] = false;
-    setHasTouchedToStart((prev) => ({ ...prev, [finger]: false }));
+  const handlePressOut = (finger: Finger, releaseTime: number, cancelled: boolean) => {
+    const stateAtRelease = gameStateRef.current;
+    touchHeldRef.current[finger] = isHeldAfterInput(cancelled ? 'cancel' : 'release');
+    setHasTouchedToStart((previous) => ({ ...previous, [finger]: false }));
 
-    if (gameStateRef.current === 'idle') {
-      return;
-    }
+    if (stateAtRelease === 'idle') return;
 
-    if (gameStateRef.current === 'waiting') {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
-      setGameState('game-over');
-      return;
-    }
-
-    if (gameStateRef.current === 'zap') {
-      const target = targetFingerRef.current;
-      if (!target || finger !== target) {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        if (zapTimerRef.current) clearTimeout(zapTimerRef.current);
-        setGameState('game-over');
-        return;
-      }
-
-      if (zapTimerRef.current) {
-        clearTimeout(zapTimerRef.current);
-        zapTimerRef.current = null;
-      }
-
-      const endTime = performance.now();
-      const timeDiff = endTime - startTimeRef.current;
-      setReactionTime(timeDiff);
-
-      const reactionLimit = getReactionLimit();
-      if (timeDiff > reactionLimit) {
-        setGameState('game-over');
-        return;
-      }
-
-      setZapsAvoided((prev) => prev + 1);
-      setGameState('reaction-done');
-      setBestReactionTime((prev) => (prev === null ? timeDiff : Math.min(prev, timeDiff)));
+    if (stateAtRelease === 'waiting') {
+      timersRef.current.invalidate();
+      updateGameState('game-over');
       setFilledFinger(null);
-
-      setTimeout(() => {
-        if (gameStateRef.current === 'game-over') return;
-        if (touchHeldRef.current.left && touchHeldRef.current.right) {
-          startRound();
-        } else {
-          setGameState('idle');
-        }
-      }, 1000);
+      return;
     }
+
+    if (stateAtRelease !== 'zap' || startTimeRef.current === null) return;
+
+    const target = targetFingerRef.current;
+    if (target === null || !isCorrectTarget(target, finger)) {
+      timersRef.current.invalidate();
+      updateGameState('game-over');
+      setFilledFinger(null);
+      return;
+    }
+
+    const result = evaluateReaction(startTimeRef.current, releaseTime, getReactionLimit());
+    setReactionTime(Math.max(0, result.reactionTime));
+    timersRef.current.invalidate();
+
+    if (result.kind !== 'valid') {
+      updateGameState('game-over');
+      setFilledFinger(null);
+      return;
+    }
+
+    setZapsAvoided((previous) => previous + 1);
+    setBestReactionTime((previous) =>
+      previous === null ? result.reactionTime : Math.min(previous, result.reactionTime)
+    );
+    setFilledFinger(null);
+    updateGameState('reaction-done');
+
+    const transitionId = timersRef.current.beginRound();
+    timersRef.current.schedule(transitionId, () => {
+      targetFingerRef.current = null;
+      startTimeRef.current = null;
+      updateGameState('idle');
+    }, 1_000);
   };
 
   return (

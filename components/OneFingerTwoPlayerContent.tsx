@@ -8,7 +8,7 @@ interface OneFingerTwoPlayerContent {
   isFilled: boolean;
   lives: { p1: number; p2: number };
   onPlayerPressIn: (player: Player) => void;
-  onPlayerPressOut: (player: Player) => void;
+  onPlayerPressOut: (player: Player, releaseTime: number, cancelled: boolean) => void;
   roundWinner: string;
   gameState: 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
   reactionTime: { p1: number | null; p2: number | null };
@@ -71,7 +71,7 @@ export default function TwoPlayerGameContent(props: OneFingerTwoPlayerContent) {
           {hasTouchedToStart.p2 ? 'WAITING...' : 'TOUCH & HOLD TO START'}
         </Text>
         {/* TOP: Player 2 Box */}
-        <GestureDetector gesture={Gesture.LongPress().minDuration(0).onStart(() => scheduleOnRN(onPlayerPressIn,'p2')).onEnd(() => scheduleOnRN(onPlayerPressOut,'p2'))}>
+        <GestureDetector gesture={Gesture.LongPress().minDuration(0).shouldCancelWhenOutside(false).onStart(() => scheduleOnRN(onPlayerPressIn,'p2')).onEnd((_, success) => scheduleOnRN(onPlayerPressOut,'p2', performance.now(), !success))}>
           <View style={[styles.rectangle, styles.rectangleTop, isFilled && styles.filled]}>
             <Text style={styles.livesText}>❤️ {lives.p2}</Text>
             <Text style={styles.playerLabel}>PLAYER 2</Text>
@@ -85,7 +85,7 @@ export default function TwoPlayerGameContent(props: OneFingerTwoPlayerContent) {
         <Text style={styles.statusTextTop}>{gameState.toUpperCase()}</Text>
         <Text style={styles.statusText}>{gameState.toUpperCase()}</Text>
 
-        <GestureDetector gesture={Gesture.LongPress().minDuration(0).onStart(() => scheduleOnRN(onPlayerPressIn,'p1')).onEnd(() => scheduleOnRN(onPlayerPressOut,'p1'))}>
+        <GestureDetector gesture={Gesture.LongPress().minDuration(0).shouldCancelWhenOutside(false).onStart(() => scheduleOnRN(onPlayerPressIn,'p1')).onEnd((_, success) => scheduleOnRN(onPlayerPressOut,'p1', performance.now(), !success))}>
           <View style={[styles.rectangle, styles.rectangleBottom, isFilled && styles.filled]}>
             <Text style={styles.livesText}>❤️ {lives.p1}</Text>
             <Text style={styles.playerLabel}>PLAYER 1</Text>

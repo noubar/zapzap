@@ -161,3 +161,5 @@ When working on this project:
 2. **Understand before implementing**: Read the relevant docs section before writing code
 
 3. **Follow existing patterns**: Look at existing components and screens for patterns to follow
+
+4. **Maintain the changelog**: Whenever Codex modifies the project's source code, configuration, tests, dependencies, or assets, it must also review and update `CHANGELOG.md` with a concise and accurate description of the changes made. Use the `Unreleased` section unless a release version has explicitly been specified. Do not document unimplemented functionality as completed.
