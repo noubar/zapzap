@@ -7,8 +7,10 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
 import {
   formatPlayerRoundResult,
+  getWinsRequired,
   type MultiplayerRoundResults,
 } from '../gameplay/multiplayer';
+import { MATCH_FORMAT_LABELS, type MatchFormat } from '../settings/gameSettings';
 import GameResultScreen from './GameResultScreen';
 
 type Player = 'p1' | 'p2';
@@ -17,6 +19,8 @@ type BoxIndex = 0 | 1;
 interface TwoFingerTwoPlayerContentProps {
   targets: { p1: number | null; p2: number | null };
   lives: { p1: number; p2: number };
+  roundWins: { p1: number; p2: number };
+  matchFormat: MatchFormat;
   onBoxPressIn: (player: Player, index: BoxIndex) => void;
   onBoxPressOut: (player: Player, index: BoxIndex, releaseTime: number, cancelled: boolean) => void;
   roundWinner: string;
@@ -30,7 +34,7 @@ interface TwoFingerTwoPlayerContentProps {
 }
 
 export default function TwoFingerTwoPlayerContent({
-  targets, lives, onBoxPressIn, onBoxPressOut, roundWinner, roundDetail,
+  targets, lives, roundWins, matchFormat, onBoxPressIn, onBoxPressOut, roundWinner, roundDetail,
   gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart,
 }: TwoFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
@@ -41,8 +45,9 @@ export default function TwoFingerTwoPlayerContent({
         message={isDraw ? 'Both players are out of lives.' : 'MATCH COMPLETE'}
         tone={isDraw ? 'draw' : 'victory'}
         stats={[
-          { label: 'Player 1 lives', value: String(lives.p1), accent: 'player1' },
-          { label: 'Player 2 lives', value: String(lives.p2), accent: 'player2' },
+          { label: 'Format', value: MATCH_FORMAT_LABELS[matchFormat] },
+          { label: matchFormat === 'three-lives' ? 'Player 1 lives' : 'Player 1 wins', value: String(matchFormat === 'three-lives' ? lives.p1 : roundWins.p1), accent: 'player1' },
+          { label: matchFormat === 'three-lives' ? 'Player 2 lives' : 'Player 2 wins', value: String(matchFormat === 'three-lives' ? lives.p2 : roundWins.p2), accent: 'player2' },
           { label: 'Best reaction', value: formatReactionTime(bestReactionTime) },
         ]}
         onPlayAgain={resetGame}
@@ -95,6 +100,12 @@ export default function TwoFingerTwoPlayerContent({
     const playerWon = gameState === 'round-result' && roundWinner === `Player ${playerNumber}`;
     const draw = gameState === 'round-result' && (roundWinner === 'Draw' || roundWinner.includes('draw'));
     const result = roundResults[player];
+    const winsRequired = getWinsRequired(matchFormat);
+    const scoreText = matchFormat === 'three-lives'
+      ? `LIVES ${lives[player]}`
+      : matchFormat === 'single-round'
+        ? 'SINGLE ROUND'
+        : `WINS ${roundWins[player]}/${winsRequired}`;
     return (
       <View style={[styles.playerArea, top ? styles.playerAreaTop : styles.playerAreaBottom, top && styles.rotated]}>
         <View style={styles.boxRow}>{renderBox(player, 0)}{renderBox(player, 1)}</View>
@@ -104,7 +115,7 @@ export default function TwoFingerTwoPlayerContent({
           draw && styles.drawPanel,
         ]}>
           <Text style={[styles.playerLabel, player === 'p1' ? styles.p1 : styles.p2]}>PLAYER {playerNumber}</Text>
-          <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>LIVES {lives[player]}</Text>
+          <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>{scoreText}</Text>
           <Text style={styles.readyText}>{playerWon ? 'ROUND WIN' : hasTouchedToStart[player] ? 'READY' : 'HOLD BOTH'}</Text>
           {(result !== null || gameState === 'round-result') && (
             <Text style={[

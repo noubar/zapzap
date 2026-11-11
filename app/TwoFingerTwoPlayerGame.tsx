@@ -6,27 +6,28 @@ import { StyleSheet, View } from 'react-native';
 import TwoFingerTwoPlayerContent from '../components/TwoFingerTwoPlayerContent';
 import { createRandomWait, evaluateReaction, isCorrectTarget, isHeldAfterInput } from '../gameplay/core';
 import {
-  applyRoundOutcome,
+  applyMatchOutcome,
   areBothPlayersReady,
   createInitialMultiplayerState,
   createSharedSignal,
-  getMatchWinner,
+  getConfiguredMatchWinner,
   recordRoundResult,
   selectIndependentTargets,
   settleCompletedRound,
   settleSingleFailure,
   type MultiplayerRoundOutcome,
   type MultiplayerRoundResults,
+  type MultiplayerMatchScore,
   type Player,
   type RoundFailureReason,
 } from '../gameplay/multiplayer';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
 type BoxIndex = 0 | 1;
 type GameState = 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
 
-const REACTION_DEADLINE_MS = 500;
 const RESULT_DISPLAY_MS = 1_000;
 
 const playerLabel = (player: Player) => player === 'p1' ? 'Player 1' : 'Player 2';
@@ -38,7 +39,11 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const [gameState, setGameState] = useState<GameState>('idle');
   const [targets, setTargets] = useState<{ p1: BoxIndex | null; p2: BoxIndex | null }>({ p1: null, p2: null });
   const [roundResults, setRoundResults] = useState(initialMatch.results);
-  const [lives, setLives] = useState(initialMatch.lives);
+  const [matchScore, setMatchScore] = useState<MultiplayerMatchScore>({
+    lives: initialMatch.lives,
+    roundWins: initialMatch.roundWins,
+    roundsPlayed: initialMatch.roundsPlayed,
+  });
   const [roundWinner, setRoundWinner] = useState('');
   const [roundDetail, setRoundDetail] = useState('');
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
@@ -47,6 +52,8 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const timersRef = useRef(new RoundTimerManager());
   const activeRoundIdRef = useRef<number | null>(null);
   const signalTimeRef = useRef<number | null>(null);
+  const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
+  const matchFormatRef = useRef(settings.matchFormat);
   const targetsRef = useRef<{ p1: BoxIndex | null; p2: BoxIndex | null }>({ p1: null, p2: null });
   const roundResultsRef = useRef<MultiplayerRoundResults>(initialMatch.results);
   const touchHeldRef = useRef<{ p1: [boolean, boolean]; p2: [boolean, boolean] }>({
@@ -58,14 +65,14 @@ export default function TwoFingerTwoPlayerGameScreen() {
   useEffect(() => () => timersRef.current.invalidate(), []);
 
   useEffect(() => {
-    const winner = getMatchWinner(lives);
+    const winner = getConfiguredMatchWinner(matchScore, matchFormatRef.current);
     if (winner === null) return;
     timersRef.current.invalidate();
     activeRoundIdRef.current = null;
     setRoundWinner(winner === 'draw' ? 'Draw' : playerLabel(winner));
     setRoundDetail('MATCH COMPLETE');
     updateGameState('game-over');
-  }, [lives]);
+  }, [matchScore]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
@@ -96,7 +103,12 @@ export default function TwoFingerTwoPlayerGameScreen() {
     resetReadiness();
     replaceTargets({ p1: null, p2: null });
     replaceRoundResults(nextMatch.results);
-    setLives(nextMatch.lives);
+    matchFormatRef.current = settings.matchFormat;
+    setMatchScore({
+      lives: nextMatch.lives,
+      roundWins: nextMatch.roundWins,
+      roundsPlayed: nextMatch.roundsPlayed,
+    });
     setRoundWinner('');
     setRoundDetail('');
     setBestReactionTime(null);
@@ -122,7 +134,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const settleOutcome = (roundId: number, outcome: MultiplayerRoundOutcome) => {
     if (roundResolvedRef.current || !timersRef.current.isCurrent(roundId)) return;
     roundResolvedRef.current = true;
-    setLives((previous) => applyRoundOutcome(previous, outcome));
+    setMatchScore((previous) => applyMatchOutcome(previous, matchFormatRef.current, outcome));
     setRoundWinner(outcome.winner === 'draw' ? 'Draw' : playerLabel(outcome.winner));
     setRoundDetail({
       'faster-reaction': 'FASTER REACTION',
@@ -166,6 +178,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const beginWaitingForZap = () => {
     const roundId = timersRef.current.beginRound();
     activeRoundIdRef.current = roundId;
+    roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     roundResolvedRef.current = false;
     signalTimeRef.current = null;
     replaceTargets({ p1: null, p2: null });
@@ -183,7 +196,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
         signalTimeRef.current = signal.signalTime;
         updateGameState('zap');
 
-        if (settings.vibrationEnabled) {
+        if (settings.hapticsEnabled) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -201,7 +214,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
             const outcome = settleCompletedRound(results);
             if (outcome) settleOutcome(roundId, outcome);
           });
-        }, REACTION_DEADLINE_MS);
+        }, roundDeadlineRef.current);
       });
     }, createRandomWait());
   };
@@ -247,7 +260,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
     const evaluation = evaluateReaction(
       signalTimeRef.current,
       releaseTime,
-      REACTION_DEADLINE_MS
+      roundDeadlineRef.current
     );
     if (evaluation.kind !== 'valid') {
       recordFailureAndSettle(player, evaluation.kind === 'false-start' ? 'false-start' : 'late');
@@ -264,7 +277,9 @@ export default function TwoFingerTwoPlayerGameScreen() {
     <View style={styles.container}>
       <TwoFingerTwoPlayerContent
         targets={targets}
-        lives={lives}
+        lives={matchScore.lives}
+        roundWins={matchScore.roundWins}
+        matchFormat={matchFormatRef.current}
         onBoxPressIn={onBoxPressIn}
         onBoxPressOut={onBoxPressOut}
         roundWinner={roundWinner}

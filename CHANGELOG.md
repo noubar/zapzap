@@ -6,6 +6,11 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- A safe-area-aware Game Options route for difficulty, multiplayer format, haptics, future feature visibility, and confirmed preference reset.
+- Versioned, validated offline settings persistence using `@react-native-async-storage/async-storage`, including corrupted-data recovery and legacy migration.
+- Easy, Normal, Hard, and Insane difficulty profiles with centralized 500, 350, 250, and 180 ms reaction deadlines.
+- Single Round, Best of 3, Best of 5, and Best of 7 multiplayer formats alongside the existing Three Lives rules.
+- Deterministic settings and match-format tests covering hydration, persistence, migration, reset, immutable round snapshots, scoring, and draws.
 - Deterministic multiplayer outcome utilities and regression coverage for shared signaling, readiness, exact ties, deadlines, wrong-finger releases, duplicate input, life penalties, match resets, and repeated rounds.
 - A shared arcade theme and reusable result screen now centralize ZapZap colors, typography, spacing, reaction-time formatting, and end-of-round actions.
 - Accessible names, hints, states, and text cues accompany the reaction controls and color feedback.
@@ -15,6 +20,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- All four game variants now read centralized settings; reaction deadlines are snapshotted per round and multiplayer format is locked for the complete match.
+- Existing vibration behavior now uses the persistent Haptic Feedback preference without adding work to the reaction timestamp path.
+- The legacy Medium difficulty is presented and migrated as Normal, while maintaining its 350 ms deadline.
+- Multiplayer score presentation switches between remaining lives and round wins according to the selected format.
 - Both multiplayer modes now settle rounds from independently captured per-player results using one shared signal timestamp and one guarded outcome calculation.
 - Multiplayer reaction controls explicitly allow simultaneous cross-component gesture recognition so one active hold does not cancel another player's or finger's handler.
 - Multiplayer round summaries now show each player's reaction time or explicit failure reason alongside the winner and updated lives.
@@ -27,6 +36,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Settings hydration cannot overwrite saved preferences with defaults before the initial storage read completes, and unchanged values do not trigger redundant writes.
+- Fake Signals remains forcibly disabled until its gameplay is implemented; Sound Effects and Visual Effects are clearly unavailable rather than implying active functionality.
 - Multiplayer releases no longer replace the active deadline timer after the first valid reaction; both players remain independently recordable until settlement.
 - Duplicate releases and stale callbacks cannot apply multiple life penalties, and match completion cancels all remaining round callbacks.
 - Simultaneous failures collected in the same frame now produce the established draw penalty for both players instead of depending on callback order.
@@ -42,6 +53,7 @@ All notable changes to this project are documented in this file.
 
 ### Known Limitations
 
+- Fake Signals, sound playback, and optional decorative visual effects remain unavailable and are labeled Coming Soon in Game Options.
 - Four-finger gesture recognition and near-simultaneous native release delivery still require physical Android and iOS device testing.
 - Automated browser viewport inspection was unavailable in this environment; responsive appearance, multi-touch feel, haptics, and safe-area behavior still require phone/tablet and physical Android/iOS verification.
 - Exact display photon-to-touch latency cannot be measured from JavaScript. Animation-frame signal timing and UI-thread release timestamps reduce software scheduling error but still include platform rendering and input latency.

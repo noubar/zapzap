@@ -1,15 +1,16 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { arcadeColors, arcadeMetrics, arcadeTypography } from '../constants/ArcadeTheme';
+import type { Difficulty } from '../settings/gameSettings';
 
 interface DifficultyLevel {
   label: string;
-  value: 'easy' | 'medium' | 'hard';
+  value: Difficulty;
 }
 
 interface DifficultySelectorProps {
-  difficulty: 'easy' | 'medium' | 'hard';
-  setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
+  difficulty: Difficulty;
+  setDifficulty: (level: Difficulty) => void;
   hasTouchedToStart: boolean;
   levels: DifficultyLevel[];
 }

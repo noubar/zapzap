@@ -6,30 +6,30 @@ import { StyleSheet, View } from 'react-native';
 import SinglePlayerGameContent from '../components/OneFingerSinglePlayerContent';
 import { createRandomWait, evaluateReaction, isHeldAfterInput } from '../gameplay/core';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
-const difficultyLevels = [
-  { label: 'Easy', value: 'easy' as const, reactionLimit: 500 },
-  { label: 'Medium', value: 'medium' as const, reactionLimit: 350 },
-  { label: 'Hard', value: 'hard' as const, reactionLimit: 250 },
-];
+const difficultyLevels = DIFFICULTIES.map((value) => ({
+  label: DIFFICULTY_PROFILES[value].label,
+  value,
+}));
 
 type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 
 export default function SinglePlayerGameScreen() {
   const router = useRouter();
-  const { settings } = useGlobalSettings();
+  const { settings, setSetting } = useGlobalSettings();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isFilled, setIsFilled] = useState(false);
   const [reactionTime, setReactionTime] = useState(0);
   const [zapesAvoided, setZapesAvoided] = useState(0);
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState(false);
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [failureReason, setFailureReason] = useState('Round ended.');
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
+  const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const touchHeldRef = useRef(false);
   const gameStateRef = useRef<GameState>('idle');
 
@@ -39,9 +39,6 @@ export default function SinglePlayerGameScreen() {
     gameStateRef.current = nextState;
     setGameState(nextState);
   };
-
-  const getReactionLimit = () =>
-    difficultyLevels.find((level) => level.value === difficulty)?.reactionLimit ?? 500;
 
   const resetGame = () => {
     timersRef.current.invalidate();
@@ -69,6 +66,7 @@ export default function SinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     updateGameState('waiting');
     setIsFilled(false);
     setReactionTime(0);
@@ -82,7 +80,7 @@ export default function SinglePlayerGameScreen() {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.vibrationEnabled) {
+        if (settings.hapticsEnabled) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -95,7 +93,7 @@ export default function SinglePlayerGameScreen() {
             updateGameState('game-over');
             setIsFilled(false);
           });
-        }, getReactionLimit());
+        }, roundDeadlineRef.current);
       });
     }, createRandomWait());
   };
@@ -124,7 +122,7 @@ export default function SinglePlayerGameScreen() {
 
     if (stateAtRelease !== 'zap' || startTimeRef.current === null) return;
 
-    const result = evaluateReaction(startTimeRef.current, releaseTime, getReactionLimit());
+    const result = evaluateReaction(startTimeRef.current, releaseTime, roundDeadlineRef.current);
     setReactionTime(Math.max(0, result.reactionTime));
 
     if (result.kind !== 'valid') {
@@ -157,8 +155,8 @@ export default function SinglePlayerGameScreen() {
         router={router}
         zapesAvoided={zapesAvoided}
         hasTouchedToStart={hasTouchedToStart}
-        difficulty={difficulty}
-        setDifficulty={setDifficulty}
+        difficulty={settings.difficulty}
+        setDifficulty={(difficulty) => setSetting('difficulty', difficulty)}
         levels={difficultyLevels}
         failureReason={failureReason}
       />

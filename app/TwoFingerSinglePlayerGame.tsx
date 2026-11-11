@@ -11,31 +11,31 @@ import {
   isHeldAfterInput,
 } from '../gameplay/core';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
+import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
 type Finger = 'left' | 'right';
 type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 
-const difficultyLevels = [
-  { label: 'Easy', value: 'easy' as const, reactionLimit: 500 },
-  { label: 'Medium', value: 'medium' as const, reactionLimit: 350 },
-  { label: 'Hard', value: 'hard' as const, reactionLimit: 250 },
-];
+const difficultyLevels = DIFFICULTIES.map((value) => ({
+  label: DIFFICULTY_PROFILES[value].label,
+  value,
+}));
 
 export default function TwoFingerSinglePlayerGameScreen() {
   const router = useRouter();
-  const { settings } = useGlobalSettings();
+  const { settings, setSetting } = useGlobalSettings();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [filledFinger, setFilledFinger] = useState<Finger | null>(null);
   const [reactionTime, setReactionTime] = useState(0);
   const [zapsAvoided, setZapsAvoided] = useState(0);
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ left: false, right: false });
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
   const [failureReason, setFailureReason] = useState('Round ended.');
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
+  const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const targetFingerRef = useRef<Finger | null>(null);
   const touchHeldRef = useRef({ left: false, right: false });
   const gameStateRef = useRef<GameState>('idle');
@@ -46,9 +46,6 @@ export default function TwoFingerSinglePlayerGameScreen() {
     gameStateRef.current = nextState;
     setGameState(nextState);
   };
-
-  const getReactionLimit = () =>
-    difficultyLevels.find((level) => level.value === difficulty)?.reactionLimit ?? 500;
 
   const resetGame = () => {
     timersRef.current.invalidate();
@@ -66,6 +63,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
     const target = Math.random() < 0.5 ? 'left' : 'right';
     targetFingerRef.current = target;
     startTimeRef.current = null;
@@ -81,7 +79,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.vibrationEnabled) {
+        if (settings.hapticsEnabled) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -94,7 +92,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
             setHasTouchedToStart({ left: false, right: false });
             touchHeldRef.current = { left: false, right: false };
           });
-        }, getReactionLimit());
+        }, roundDeadlineRef.current);
       });
     }, createRandomWait());
   };
@@ -140,7 +138,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       return;
     }
 
-    const result = evaluateReaction(startTimeRef.current, releaseTime, getReactionLimit());
+    const result = evaluateReaction(startTimeRef.current, releaseTime, roundDeadlineRef.current);
     setReactionTime(Math.max(0, result.reactionTime));
     timersRef.current.invalidate();
 
@@ -179,8 +177,8 @@ export default function TwoFingerSinglePlayerGameScreen() {
         router={router}
         zapsAvoided={zapsAvoided}
         hasTouchedToStart={hasTouchedToStart}
-        difficulty={difficulty}
-        setDifficulty={setDifficulty}
+        difficulty={settings.difficulty}
+        setDifficulty={(difficulty) => setSetting('difficulty', difficulty)}
         levels={difficultyLevels}
         failureReason={failureReason}
       />

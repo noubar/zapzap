@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import type { Difficulty } from '../settings/gameSettings';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
 
@@ -21,9 +22,9 @@ interface TwoFingerSinglePlayerContentProps {
   router: Router;
   zapsAvoided: number;
   hasTouchedToStart: { left: boolean; right: boolean };
-  difficulty: 'easy' | 'medium' | 'hard';
-  setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
-  levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
+  difficulty: Difficulty;
+  setDifficulty: (level: Difficulty) => void;
+  levels: { label: string; value: Difficulty }[];
   failureReason: string;
 }
 

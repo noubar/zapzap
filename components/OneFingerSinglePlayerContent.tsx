@@ -10,6 +10,7 @@ import {
   arcadeTypography,
   formatReactionTime,
 } from '../constants/ArcadeTheme';
+import type { Difficulty } from '../settings/gameSettings';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
 
@@ -24,9 +25,9 @@ interface OneFingerSinglePlayerContentProps {
   router: Router;
   zapesAvoided: number;
   hasTouchedToStart: boolean;
-  difficulty: 'easy' | 'medium' | 'hard';
-  setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
-  levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
+  difficulty: Difficulty;
+  setDifficulty: (level: Difficulty) => void;
+  levels: { label: string; value: Difficulty }[];
   failureReason: string;
 }
 

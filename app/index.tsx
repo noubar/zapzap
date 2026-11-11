@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { User, Users, Vibrate } from 'lucide-react-native';
+import type { Href } from 'expo-router';
+import { SlidersHorizontal, User, Users } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,11 +10,9 @@ import {
   arcadeMetrics,
   arcadeTypography,
 } from '../constants/ArcadeTheme';
-import { useGlobalSettings } from './GlobalSettings';
 
 export default function MenuScreen() {
   const [fingerMode, setFingerMode] = useState<1 | 2>(1);
-  const { settings, setSetting } = useGlobalSettings();
 
   const menuOptions = useMemo(
     () => [
@@ -67,19 +66,13 @@ export default function MenuScreen() {
         <View style={styles.content}>
           <View style={styles.utilityRow}>
             <Pressable
-              style={({ pressed }) => [styles.vibrationToggle, pressed && styles.pressed]}
-              onPress={() => setSetting('vibrationEnabled', !settings.vibrationEnabled)}
-              accessibilityRole="switch"
-              accessibilityLabel="Vibration feedback"
-              accessibilityState={{ checked: settings.vibrationEnabled }}
+              style={({ pressed }) => [styles.optionsButton, pressed && styles.pressed]}
+              onPress={() => router.push('/options' as Href)}
+              accessibilityRole="button"
+              accessibilityLabel="Open game options"
             >
-              <Vibrate
-                size={18}
-                color={settings.vibrationEnabled ? arcadeColors.success : arcadeColors.textMuted}
-              />
-              <Text style={styles.vibrationLabel}>
-                HAPTICS {settings.vibrationEnabled ? 'ON' : 'OFF'}
-              </Text>
+              <SlidersHorizontal size={18} color={arcadeColors.text} />
+              <Text style={styles.optionsLabel}>GAME OPTIONS</Text>
             </Pressable>
           </View>
 
@@ -182,14 +175,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  vibrationToggle: {
+  optionsButton: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: arcadeMetrics.spacing.sm,
     paddingHorizontal: arcadeMetrics.spacing.sm,
   },
-  vibrationLabel: {
+  optionsLabel: {
     ...arcadeTypography.eyebrow,
     color: arcadeColors.text,
     letterSpacing: 1,

@@ -1,4 +1,5 @@
 import { compareReactionTimes } from './core';
+import type { MatchFormat } from '../settings/gameSettings';
 
 export type Player = 'p1' | 'p2';
 export type RoundFailureReason =
@@ -25,6 +26,11 @@ export type MultiplayerRoundOutcome = {
 
 export type MultiplayerLives = { p1: number; p2: number };
 export type MatchWinner = Player | 'draw' | null;
+export type MultiplayerMatchScore = {
+  lives: MultiplayerLives;
+  roundWins: { p1: number; p2: number };
+  roundsPlayed: number;
+};
 
 export const EMPTY_ROUND_RESULTS: MultiplayerRoundResults = { p1: null, p2: null };
 export const INITIAL_MULTIPLAYER_LIVES: MultiplayerLives = { p1: 3, p2: 3 };
@@ -32,8 +38,57 @@ export const INITIAL_MULTIPLAYER_LIVES: MultiplayerLives = { p1: 3, p2: 3 };
 export function createInitialMultiplayerState() {
   return {
     lives: { ...INITIAL_MULTIPLAYER_LIVES },
+    roundWins: { p1: 0, p2: 0 },
+    roundsPlayed: 0,
     results: { ...EMPTY_ROUND_RESULTS },
   };
+}
+
+export function getWinsRequired(matchFormat: MatchFormat) {
+  const required: Record<Exclude<MatchFormat, 'three-lives' | 'single-round'>, number> = {
+    'best-of-three': 2,
+    'best-of-five': 3,
+    'best-of-seven': 4,
+  };
+  if (matchFormat === 'single-round') return 1;
+  if (matchFormat === 'three-lives') return null;
+  return required[matchFormat];
+}
+
+export function applyMatchOutcome(
+  score: MultiplayerMatchScore,
+  matchFormat: MatchFormat,
+  outcome: MultiplayerRoundOutcome
+): MultiplayerMatchScore {
+  if (matchFormat === 'three-lives') {
+    return {
+      ...score,
+      lives: applyRoundOutcome(score.lives, outcome),
+      roundsPlayed: score.roundsPlayed + 1,
+    };
+  }
+
+  const roundWins = { ...score.roundWins };
+  if (outcome.winner !== 'draw') roundWins[outcome.winner] += 1;
+  return { ...score, roundWins, roundsPlayed: score.roundsPlayed + 1 };
+}
+
+export function getConfiguredMatchWinner(
+  score: MultiplayerMatchScore,
+  matchFormat: MatchFormat
+): MatchWinner {
+  if (matchFormat === 'three-lives') return getMatchWinner(score.lives);
+  if (matchFormat === 'single-round') {
+    if (score.roundsPlayed < 1) return null;
+    if (score.roundWins.p1 === score.roundWins.p2) return 'draw';
+    return score.roundWins.p1 > score.roundWins.p2 ? 'p1' : 'p2';
+  }
+
+  const winsRequired = getWinsRequired(matchFormat);
+  if (winsRequired === null) return null;
+  if (score.roundWins.p1 >= winsRequired) return 'p1';
+  if (score.roundWins.p2 >= winsRequired) return 'p2';
+  return null;
 }
 
 export function areBothPlayersReady(

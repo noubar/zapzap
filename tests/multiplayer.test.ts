@@ -4,10 +4,12 @@ import test from 'node:test';
 import { createRandomWait, evaluateReaction, isCorrectTarget } from '../gameplay/core.ts';
 import {
   applyRoundOutcome,
+  applyMatchOutcome,
   areBothPlayersReady,
   createInitialMultiplayerState,
   createSharedSignal,
   getMatchWinner,
+  getConfiguredMatchWinner,
   recordRoundResult,
   selectIndependentTargets,
   settleCompletedRound,
@@ -168,8 +170,67 @@ test('play again creates fresh lives and reaction records', () => {
   const reset = createInitialMultiplayerState();
   assert.deepEqual(reset, {
     lives: { p1: 3, p2: 3 },
+    roundWins: { p1: 0, p2: 0 },
+    roundsPlayed: 0,
     results: { p1: null, p2: null },
   });
+});
+
+test('three lives format preserves the established life rules', () => {
+  const initial = createInitialMultiplayerState();
+  const outcome = settleCompletedRound({ p1: valid(100), p2: valid(200) });
+  assert.ok(outcome);
+  const score = applyMatchOutcome(initial, 'three-lives', outcome);
+  assert.deepEqual(score.lives, { p1: 3, p2: 2 });
+  assert.deepEqual(score.roundWins, { p1: 0, p2: 0 });
+});
+
+test('a duplicate release cannot register a second match score', () => {
+  let results: MultiplayerRoundResults = { p1: null, p2: null };
+  results = recordRoundResult(results, 'p1', valid(100));
+  results = recordRoundResult(results, 'p1', valid(50));
+  results = recordRoundResult(results, 'p2', valid(200));
+  const outcome = settleCompletedRound(results);
+  assert.ok(outcome);
+  const score = applyMatchOutcome(createInitialMultiplayerState(), 'best-of-three', outcome);
+  assert.deepEqual(score.roundWins, { p1: 1, p2: 0 });
+});
+
+test('single round ends after one decisive result or an exact draw', () => {
+  const initial = createInitialMultiplayerState();
+  const win = settleCompletedRound({ p1: valid(100), p2: valid(200) });
+  const draw = settleCompletedRound({ p1: valid(100), p2: valid(100) });
+  assert.ok(win && draw);
+  assert.equal(getConfiguredMatchWinner(applyMatchOutcome(initial, 'single-round', win), 'single-round'), 'p1');
+  assert.equal(getConfiguredMatchWinner(applyMatchOutcome(initial, 'single-round', draw), 'single-round'), 'draw');
+});
+
+test('best-of-three, five, and seven end at two, three, and four wins', () => {
+  const outcome = settleCompletedRound({ p1: valid(100), p2: valid(200) });
+  assert.ok(outcome);
+  const cases = [
+    ['best-of-three', 2],
+    ['best-of-five', 3],
+    ['best-of-seven', 4],
+  ] as const;
+  for (const [format, required] of cases) {
+    let score = createInitialMultiplayerState();
+    for (let index = 0; index < required - 1; index += 1) {
+      score = { ...score, ...applyMatchOutcome(score, format, outcome) };
+      assert.equal(getConfiguredMatchWinner(score, format), null);
+    }
+    score = { ...score, ...applyMatchOutcome(score, format, outcome) };
+    assert.equal(getConfiguredMatchWinner(score, format), 'p1');
+  }
+});
+
+test('best-of draws award no win and cannot finish a match', () => {
+  const initial = createInitialMultiplayerState();
+  const draw = settleCompletedRound({ p1: invalid('timeout'), p2: invalid('timeout') });
+  assert.ok(draw);
+  const score = applyMatchOutcome(initial, 'best-of-three', draw);
+  assert.deepEqual(score.roundWins, { p1: 0, p2: 0 });
+  assert.equal(getConfiguredMatchWinner(score, 'best-of-three'), null);
 });
 
 test('multiplayer timer invalidation prevents an old deadline from settling', () => {
