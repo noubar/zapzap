@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import {
   formatPlayerRoundResult,
   getWinsRequired,
@@ -30,11 +31,12 @@ interface OneFingerTwoPlayerContentProps {
   resetGame: () => void;
   router: Router;
   hasTouchedToStart: { p1: boolean; p2: boolean };
+  fakeSignal: { color: FakeSignalColor; colorName: FakeSignalName } | null;
 }
 
 export default function OneFingerTwoPlayerContent({
   isFilled, lives, roundWins, matchFormat, onPlayerPressIn, onPlayerPressOut, roundWinner, roundDetail,
-  gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart,
+  gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart, fakeSignal,
 }: OneFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
     const isDraw = roundWinner === 'Draw';
@@ -72,6 +74,8 @@ export default function OneFingerTwoPlayerContent({
     ? roundWinner.toUpperCase()
     : gameState === 'zap'
       ? 'GO!'
+      : fakeSignal
+        ? 'IGNORE'
       : hasTouchedToStart.p1 && hasTouchedToStart.p2
         ? 'KEEP HOLDING'
         : 'GET READY';
@@ -98,6 +102,7 @@ export default function OneFingerTwoPlayerContent({
             styles.rectangle,
             top ? styles.rectangleTop : styles.rectangleBottom,
             hasTouchedToStart[player] && !isFilled && styles.held,
+            fakeSignal && { backgroundColor: fakeSignal.color },
             gameState === 'round-result' && !draw && (playerWon ? styles.successBox : styles.failureBox),
             draw && styles.drawBox,
             isFilled && styles.filled,
@@ -109,8 +114,11 @@ export default function OneFingerTwoPlayerContent({
           <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>
             {scoreText}
           </Text>
-          <Text style={[styles.boxAction, isFilled && styles.boxActionSignal]}>
-            {isFilled ? 'GO!' : playerWon ? 'ROUND WIN' : 'HOLD'}
+          <Text style={[
+            styles.boxAction,
+            (isFilled || fakeSignal?.colorName === 'amber') && styles.boxActionSignal,
+          ]}>
+            {isFilled ? 'GO!' : fakeSignal ? 'IGNORE' : playerWon ? 'ROUND WIN' : 'HOLD'}
           </Text>
           {(result !== null || gameState === 'round-result') && (
             <Text style={[

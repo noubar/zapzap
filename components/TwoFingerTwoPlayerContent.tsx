@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import {
   formatPlayerRoundResult,
   getWinsRequired,
@@ -31,11 +32,16 @@ interface TwoFingerTwoPlayerContentProps {
   resetGame: () => void;
   router: Router;
   hasTouchedToStart: { p1: boolean; p2: boolean };
+  fakeSignal: {
+    color: FakeSignalColor;
+    colorName: FakeSignalName;
+    targets: { p1: BoxIndex; p2: BoxIndex };
+  } | null;
 }
 
 export default function TwoFingerTwoPlayerContent({
   targets, lives, roundWins, matchFormat, onBoxPressIn, onBoxPressOut, roundWinner, roundDetail,
-  gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart,
+  gameState, roundResults, bestReactionTime, resetGame, router, hasTouchedToStart, fakeSignal,
 }: TwoFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
     const isDraw = roundWinner === 'Draw';
@@ -76,6 +82,7 @@ export default function TwoFingerTwoPlayerContent({
 
   const renderBox = (player: Player, index: BoxIndex) => {
     const isTarget = targets[player] === index && gameState === 'zap';
+    const isFakeTarget = fakeSignal?.targets[player] === index;
     const playerNumber = player === 'p1' ? 1 : 2;
 
     return (
@@ -85,10 +92,18 @@ export default function TwoFingerTwoPlayerContent({
           accessibilityRole="button"
           accessibilityLabel={`Player ${playerNumber} ${index === 0 ? 'left' : 'right'} reaction button${isTarget ? ', GO now' : ''}`}
           accessibilityHint="Hold both buttons. Release this button only if it turns white."
-          style={[styles.box, hasTouchedToStart[player] && styles.held, isTarget && styles.targetBox]}
+          style={[
+            styles.box,
+            hasTouchedToStart[player] && styles.held,
+            isFakeTarget && { backgroundColor: fakeSignal.color },
+            isTarget && styles.targetBox,
+          ]}
         >
-          <Text style={[styles.boxLabel, isTarget && styles.boxLabelOnTarget]}>
-            {isTarget ? 'GO!' : index === 0 ? 'L' : 'R'}
+          <Text style={[
+            styles.boxLabel,
+            (isTarget || (isFakeTarget && fakeSignal.colorName === 'amber')) && styles.boxLabelOnTarget,
+          ]}>
+            {isTarget ? 'GO!' : isFakeTarget ? 'IGNORE' : index === 0 ? 'L' : 'R'}
           </Text>
         </View>
       </GestureDetector>
@@ -135,6 +150,8 @@ export default function TwoFingerTwoPlayerContent({
     ? roundWinner.toUpperCase()
     : gameState === 'zap'
       ? 'GO!'
+      : fakeSignal
+        ? 'IGNORE'
       : hasTouchedToStart.p1 && hasTouchedToStart.p2
         ? 'KEEP HOLDING'
         : 'GET READY';

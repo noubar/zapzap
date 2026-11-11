@@ -6,6 +6,9 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Optional Fake Signals across all four game variants, using randomized blue, purple, and amber flashes that must be ignored before the real white GO signal.
+- A lightweight deterministic fake-signal scheduler with randomized counts, colors, timing, duration, safety gaps, and round-generation cancellation.
+- Fake-signal regression coverage for scheduling geometry, color selection, false starts, target independence, multiplayer synchronization, stale callbacks, persistence, and consecutive rounds.
 - A safe-area-aware Game Options route for difficulty, multiplayer format, haptics, future feature visibility, and confirmed preference reset.
 - Versioned, validated offline settings persistence using `@react-native-async-storage/async-storage`, including corrupted-data recovery and legacy migration.
 - Easy, Normal, Hard, and Insane difficulty profiles with centralized 500, 350, 250, and 180 ms reaction deadlines.
@@ -20,6 +23,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- The persistent Fake Signals option is now enabled in Game Options and described as “Ignore colored flashes. Release only on white.”
+- Fake-enabled rounds suppress signal haptics so the genuine white signal has no unique nonvisual cue; existing GO haptics remain unchanged when Fake Signals is off.
+- Two-player fake flashes share one schedule and color, while two-finger variants independently randomize which button flashes without influencing the genuine targets.
+- Signal colors are centralized in a platform-independent palette shared by gameplay scheduling and presentation.
 - All four game variants now read centralized settings; reaction deadlines are snapshotted per round and multiplayer format is locked for the complete match.
 - Existing vibration behavior now uses the persistent Haptic Feedback preference without adding work to the reaction timestamp path.
 - The legacy Medium difficulty is presented and migrated as Normal, while maintaining its 350 ms deadline.
@@ -36,8 +43,10 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Fake flashes remain presentation-only waiting states: they never create a reaction timestamp, deadline, score, life penalty, or valid release path.
+- Fake callbacks are cancelled with the owning round and cannot outlive reset, failure, success, timeout, match completion, or navigation cleanup.
 - Settings hydration cannot overwrite saved preferences with defaults before the initial storage read completes, and unchanged values do not trigger redundant writes.
-- Fake Signals remains forcibly disabled until its gameplay is implemented; Sound Effects and Visual Effects are clearly unavailable rather than implying active functionality.
+- Sound Effects and Visual Effects are clearly unavailable rather than implying active functionality.
 - Multiplayer releases no longer replace the active deadline timer after the first valid reaction; both players remain independently recordable until settlement.
 - Duplicate releases and stale callbacks cannot apply multiple life penalties, and match completion cancels all remaining round callbacks.
 - Simultaneous failures collected in the same frame now produce the established draw penalty for both players instead of depending on callback order.
@@ -53,7 +62,8 @@ All notable changes to this project are documented in this file.
 
 ### Known Limitations
 
-- Fake Signals, sound playback, and optional decorative visual effects remain unavailable and are labeled Coming Soon in Game Options.
+- Sound playback and optional decorative visual effects remain unavailable and are labeled Coming Soon in Game Options.
+- Fake-signal flash perception and cancellation during operating-system interruptions still require physical Android and iOS verification.
 - Four-finger gesture recognition and near-simultaneous native release delivery still require physical Android and iOS device testing.
 - Automated browser viewport inspection was unavailable in this environment; responsive appearance, multi-touch feel, haptics, and safe-area behavior still require phone/tablet and physical Android/iOS verification.
 - Exact display photon-to-touch latency cannot be measured from JavaScript. Animation-frame signal timing and UI-thread release timestamps reduce software scheduling error but still include platform rendering and input latency.

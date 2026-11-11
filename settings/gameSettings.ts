@@ -66,8 +66,10 @@ export function normalizeGameSettings(value: unknown): GameSettings {
     difficulty: isDifficulty(legacyDifficulty)
       ? legacyDifficulty
       : DEFAULT_GAME_SETTINGS.difficulty,
-    // Prompt 6 will enable this field. Until then it is always effectively false.
-    fakeSignalsEnabled: false,
+    fakeSignalsEnabled: booleanOr(
+      candidate.fakeSignalsEnabled,
+      DEFAULT_GAME_SETTINGS.fakeSignalsEnabled
+    ),
     matchFormat: isMatchFormat(candidate.matchFormat)
       ? candidate.matchFormat
       : DEFAULT_GAME_SETTINGS.matchFormat,

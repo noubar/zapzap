@@ -5,6 +5,12 @@ import { StyleSheet, View } from 'react-native';
 
 import SinglePlayerGameContent from '../components/OneFingerSinglePlayerContent';
 import { createRandomWait, evaluateReaction, isHeldAfterInput } from '../gameplay/core';
+import {
+  createFakeSignalSchedule,
+  isReleaseBeforeRealSignal,
+  scheduleFakeSignalEvents,
+  type FakeSignalEvent,
+} from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
@@ -26,11 +32,13 @@ export default function SinglePlayerGameScreen() {
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState(false);
   const [failureReason, setFailureReason] = useState('Round ended.');
+  const [fakeSignal, setFakeSignal] = useState<FakeSignalEvent | null>(null);
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
   const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const touchHeldRef = useRef(false);
+  const roundFakeSignalsEnabledRef = useRef(false);
   const gameStateRef = useRef<GameState>('idle');
 
   useEffect(() => () => timersRef.current.invalidate(), []);
@@ -51,11 +59,13 @@ export default function SinglePlayerGameScreen() {
     setZapesAvoided(0);
     setBestReactionTime(null);
     setFailureReason('Round ended.');
+    setFakeSignal(null);
   };
 
   const finishRound = (roundId: number) => {
     updateGameState('reaction-done');
     setIsFilled(false);
+    setFakeSignal(null);
     setHasTouchedToStart(false);
 
     timersRef.current.schedule(roundId, () => {
@@ -67,20 +77,35 @@ export default function SinglePlayerGameScreen() {
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     updateGameState('waiting');
     setIsFilled(false);
     setReactionTime(0);
     startTimeRef.current = null;
+    setFakeSignal(null);
+
+    const realSignalDelayMs = createRandomWait();
+    if (roundFakeSignalsEnabledRef.current) {
+      const schedule = createFakeSignalSchedule(realSignalDelayMs);
+      scheduleFakeSignalEvents(
+        timersRef.current,
+        roundId,
+        schedule.events,
+        setFakeSignal,
+        (event) => setFakeSignal((current) => current?.id === event.id ? null : current)
+      );
+    }
 
     timersRef.current.schedule(roundId, () => {
       if (!touchHeldRef.current) return;
 
+      setFakeSignal(null);
       setIsFilled(true);
       timersRef.current.scheduleFrame(roundId, (frameTime) => {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled) {
+        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -92,10 +117,11 @@ export default function SinglePlayerGameScreen() {
             setFailureReason('Timeout — the button was held past the deadline.');
             updateGameState('game-over');
             setIsFilled(false);
+            setFakeSignal(null);
           });
         }, roundDeadlineRef.current);
       });
-    }, createRandomWait());
+    }, realSignalDelayMs);
   };
 
   const handlePressIn = () => {
@@ -110,13 +136,14 @@ export default function SinglePlayerGameScreen() {
     touchHeldRef.current = isHeldAfterInput(cancelled ? 'cancel' : 'release');
     setHasTouchedToStart(false);
 
-    if (stateAtRelease === 'waiting') {
+    if (isReleaseBeforeRealSignal(stateAtRelease)) {
       timersRef.current.invalidate();
       setFailureReason(
         cancelled ? 'Hold interrupted before GO.' : 'False start — released before GO.'
       );
       updateGameState('game-over');
       setIsFilled(false);
+      setFakeSignal(null);
       return;
     }
 
@@ -130,6 +157,7 @@ export default function SinglePlayerGameScreen() {
       setFailureReason('Too slow — released after the deadline.');
       updateGameState('game-over');
       setIsFilled(false);
+      setFakeSignal(null);
       return;
     }
 
@@ -159,6 +187,7 @@ export default function SinglePlayerGameScreen() {
         setDifficulty={(difficulty) => setSetting('difficulty', difficulty)}
         levels={difficultyLevels}
         failureReason={failureReason}
+        fakeSignal={fakeSignal}
       />
     </View>
   );

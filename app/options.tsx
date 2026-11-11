@@ -80,10 +80,9 @@ export default function GameOptionsScreen() {
             </View>
             <ToggleRow
               label="Fake Signals"
-              description="Coming Soon — remains off until the mechanic is available."
-              value={false}
-              disabled
-              onValueChange={() => undefined}
+              description="Ignore colored flashes. Release only on white."
+              value={settings.fakeSignalsEnabled}
+              onValueChange={(value) => setSetting('fakeSignalsEnabled', value)}
             />
           </View>
 

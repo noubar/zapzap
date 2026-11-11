@@ -69,10 +69,10 @@ test('corrupted storage falls back safely and repairs the stored payload', async
   assert.equal(storage.writes[0]?.value, serializeGameSettings(DEFAULT_GAME_SETTINGS));
 });
 
-test('invalid fields fall back individually and fake signals remain off', () => {
+test('invalid fields fall back individually and invalid fake signals remain off', () => {
   assert.deepEqual(normalizeGameSettings({
     difficulty: 'impossible',
-    fakeSignalsEnabled: true,
+    fakeSignalsEnabled: 'yes',
     matchFormat: 'forever',
     soundEnabled: false,
     hapticsEnabled: 'yes',
@@ -82,6 +82,18 @@ test('invalid fields fall back individually and fake signals remain off', () => 
     soundEnabled: false,
     visualEffectsEnabled: false,
   });
+});
+
+test('fake signals can be enabled and persist through hydration', async () => {
+  const storage = new MemoryStorage();
+  const enabled = normalizeGameSettings({
+    ...DEFAULT_GAME_SETTINGS,
+    fakeSignalsEnabled: true,
+  });
+  assert.equal(enabled.fakeSignalsEnabled, true);
+  await persistGameSettings(storage, enabled, null);
+  const loaded = await hydrateGameSettings(storage);
+  assert.equal(loaded.settings.fakeSignalsEnabled, true);
 });
 
 test('changed settings persist once and unchanged settings do not rewrite', async () => {
@@ -95,8 +107,14 @@ test('changed settings persist once and unchanged settings do not rewrite', asyn
 });
 
 test('reset to defaults produces and persists the canonical default configuration', async () => {
-  const changed = normalizeGameSettings({ difficulty: 'insane', hapticsEnabled: false });
+  const changed = normalizeGameSettings({
+    difficulty: 'insane',
+    hapticsEnabled: false,
+    fakeSignalsEnabled: true,
+  });
   assert.notDeepEqual(changed, DEFAULT_GAME_SETTINGS);
+  assert.equal(changed.fakeSignalsEnabled, true);
+  assert.equal(DEFAULT_GAME_SETTINGS.fakeSignalsEnabled, false);
   assert.deepEqual(normalizeGameSettings(DEFAULT_GAME_SETTINGS), DEFAULT_GAME_SETTINGS);
   const storage = new MemoryStorage();
   const changedCanonical = serializeGameSettings(changed);
@@ -127,4 +145,12 @@ test('an active round keeps its captured deadline after settings change', () => 
   settings = { ...settings, difficulty: 'insane' as const };
   assert.equal(capturedDeadline, 500);
   assert.equal(getReactionDeadline(settings.difficulty), 180);
+});
+
+test('an active round keeps its captured fake-signal preference', () => {
+  let settings: GameSettings = { ...DEFAULT_GAME_SETTINGS, fakeSignalsEnabled: true };
+  const capturedFakeSignals = settings.fakeSignalsEnabled;
+  settings = { ...settings, fakeSignalsEnabled: false };
+  assert.equal(capturedFakeSignals, true);
+  assert.equal(settings.fakeSignalsEnabled, false);
 });

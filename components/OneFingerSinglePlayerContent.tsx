@@ -11,6 +11,7 @@ import {
   formatReactionTime,
 } from '../constants/ArcadeTheme';
 import type { Difficulty } from '../settings/gameSettings';
+import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
 
@@ -29,6 +30,7 @@ interface OneFingerSinglePlayerContentProps {
   setDifficulty: (level: Difficulty) => void;
   levels: { label: string; value: Difficulty }[];
   failureReason: string;
+  fakeSignal: { color: FakeSignalColor; colorName: FakeSignalName } | null;
 }
 
 export default function SinglePlayerGameContent({
@@ -46,6 +48,7 @@ export default function SinglePlayerGameContent({
   setDifficulty,
   levels,
   failureReason,
+  fakeSignal,
 }: OneFingerSinglePlayerContentProps) {
   const holdGesture = Gesture.LongPress()
     .minDuration(0)
@@ -76,12 +79,14 @@ export default function SinglePlayerGameContent({
   const status =
     gameState === 'zap'
       ? 'GO!'
+      : fakeSignal
+        ? 'IGNORE'
       : isSuccess
         ? 'SUCCESS'
         : hasTouchedToStart
           ? 'KEEP HOLDING'
           : 'TOUCH & HOLD';
-  const boxLabel = isFilled ? 'GO!' : isSuccess ? 'NICE!' : isHeld ? 'HOLD' : 'READY';
+  const boxLabel = isFilled ? 'GO!' : fakeSignal ? 'IGNORE' : isSuccess ? 'NICE!' : isHeld ? 'HOLD' : 'READY';
 
   return (
     <GestureHandlerRootView style={styles.screen}>
@@ -124,6 +129,7 @@ export default function SinglePlayerGameContent({
             style={[
               styles.rectangle,
               isHeld && styles.held,
+              fakeSignal && { backgroundColor: fakeSignal.color },
               isSuccess && styles.successBox,
               isFilled && styles.filled,
             ]}
@@ -131,7 +137,7 @@ export default function SinglePlayerGameContent({
             <Text
               style={[
                 styles.boxLabel,
-                (isFilled || isSuccess) && styles.boxLabelFilled,
+                (isFilled || isSuccess || fakeSignal?.colorName === 'amber') && styles.boxLabelFilled,
               ]}
             >
               {boxLabel}

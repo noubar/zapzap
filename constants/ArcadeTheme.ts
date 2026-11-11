@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { signalColors } from './SignalColors';
 
 export const arcadeColors = {
   background: '#000000',
@@ -7,7 +8,7 @@ export const arcadeColors = {
   outline: '#FFFFFF',
   text: '#FFFFFF',
   textMuted: '#A3A3A3',
-  signal: '#FFFFFF',
+  signal: signalColors.real,
   signalText: '#000000',
   success: '#39FF14',
   failure: '#FF1744',
@@ -17,9 +18,7 @@ export const arcadeColors = {
 } as const;
 
 export const reservedFakeSignalColors = {
-  blue: '#2979FF',
-  purple: '#9C27B0',
-  amber: '#FFAB00',
+  ...signalColors.fake,
 } as const;
 
 export const arcadeMetrics = {

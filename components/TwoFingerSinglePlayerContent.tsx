@@ -6,6 +6,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
 import type { Difficulty } from '../settings/gameSettings';
+import type { FakeSignalColor, FakeSignalName } from '../gameplay/fakeSignals';
 import DifficultySelector from './DifficultySelector';
 import GameResultScreen from './GameResultScreen';
 
@@ -26,12 +27,17 @@ interface TwoFingerSinglePlayerContentProps {
   setDifficulty: (level: Difficulty) => void;
   levels: { label: string; value: Difficulty }[];
   failureReason: string;
+  fakeSignal: {
+    color: FakeSignalColor;
+    colorName: FakeSignalName;
+    target: Finger;
+  } | null;
 }
 
 export default function TwoFingerSinglePlayerContent({
   filledFinger, onFingerPressIn, onFingerPressOut, gameState, reactionTime,
   bestReactionTime, resetGame, router, zapsAvoided, hasTouchedToStart,
-  difficulty, setDifficulty, levels, failureReason,
+  difficulty, setDifficulty, levels, failureReason, fakeSignal,
 }: TwoFingerSinglePlayerContentProps) {
   const hasBothTouched = hasTouchedToStart.left && hasTouchedToStart.right;
   const isSuccess = gameState === 'reaction-done';
@@ -54,6 +60,8 @@ export default function TwoFingerSinglePlayerContent({
 
   const status = gameState === 'zap'
     ? 'GO!'
+    : fakeSignal
+      ? 'IGNORE'
     : isSuccess
       ? 'SUCCESS'
       : hasBothTouched
@@ -62,6 +70,7 @@ export default function TwoFingerSinglePlayerContent({
 
   const renderFinger = (finger: Finger) => {
     const isTarget = filledFinger === finger;
+    const isFakeTarget = fakeSignal?.target === finger;
     const isHeld = hasTouchedToStart[finger] && !isTarget && !isSuccess;
     const gesture = Gesture.LongPress()
       .minDuration(0)
@@ -81,12 +90,16 @@ export default function TwoFingerSinglePlayerContent({
           style={[
             styles.rectangle,
             isHeld && styles.held,
+            isFakeTarget && { backgroundColor: fakeSignal.color },
             isSuccess && styles.successBox,
             isTarget && styles.filled,
           ]}
         >
-          <Text style={[styles.fingerLabel, (isTarget || isSuccess) && styles.fingerLabelFilled]}>
-            {isTarget ? 'GO!' : isSuccess ? 'NICE!' : finger.toUpperCase()}
+          <Text style={[
+            styles.fingerLabel,
+            (isTarget || isSuccess || (isFakeTarget && fakeSignal.colorName === 'amber')) && styles.fingerLabelFilled,
+          ]}>
+            {isTarget ? 'GO!' : isFakeTarget ? 'IGNORE' : isSuccess ? 'NICE!' : finger.toUpperCase()}
           </Text>
         </View>
       </GestureDetector>

@@ -10,11 +10,19 @@ import {
   isCorrectTarget,
   isHeldAfterInput,
 } from '../gameplay/core';
+import {
+  createFakeSignalSchedule,
+  isReleaseBeforeRealSignal,
+  scheduleFakeSignalEvents,
+  selectFakeTarget,
+  type FakeSignalEvent,
+} from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
 type Finger = 'left' | 'right';
+type TwoFingerFakeSignal = FakeSignalEvent & { target: Finger };
 type GameState = 'idle' | 'waiting' | 'zap' | 'reaction-done' | 'game-over';
 
 const difficultyLevels = DIFFICULTIES.map((value) => ({
@@ -32,6 +40,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ left: false, right: false });
   const [failureReason, setFailureReason] = useState('Round ended.');
+  const [fakeSignal, setFakeSignal] = useState<TwoFingerFakeSignal | null>(null);
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
@@ -39,6 +48,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const targetFingerRef = useRef<Finger | null>(null);
   const touchHeldRef = useRef({ left: false, right: false });
   const gameStateRef = useRef<GameState>('idle');
+  const roundFakeSignalsEnabledRef = useRef(false);
 
   useEffect(() => () => timersRef.current.invalidate(), []);
 
@@ -59,27 +69,47 @@ export default function TwoFingerSinglePlayerGameScreen() {
     targetFingerRef.current = null;
     startTimeRef.current = null;
     setFailureReason('Round ended.');
+    setFakeSignal(null);
   };
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     const target = Math.random() < 0.5 ? 'left' : 'right';
     targetFingerRef.current = target;
     startTimeRef.current = null;
     updateGameState('waiting');
     setFilledFinger(null);
     setReactionTime(0);
+    setFakeSignal(null);
+
+    const realSignalDelayMs = createRandomWait();
+    if (roundFakeSignalsEnabledRef.current) {
+      const schedule = createFakeSignalSchedule(realSignalDelayMs);
+      const fakeEvents: TwoFingerFakeSignal[] = schedule.events.map((event) => ({
+        ...event,
+        target: selectFakeTarget<Finger>('left', 'right'),
+      }));
+      scheduleFakeSignalEvents(
+        timersRef.current,
+        roundId,
+        fakeEvents,
+        setFakeSignal,
+        (event) => setFakeSignal((current) => current?.id === event.id ? null : current)
+      );
+    }
 
     timersRef.current.schedule(roundId, () => {
       if (!touchHeldRef.current.left || !touchHeldRef.current.right) return;
 
+      setFakeSignal(null);
       setFilledFinger(target);
       timersRef.current.scheduleFrame(roundId, (frameTime) => {
         startTimeRef.current = frameTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled) {
+        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -89,12 +119,13 @@ export default function TwoFingerSinglePlayerGameScreen() {
             setFailureReason('Timeout — the target finger was held past the deadline.');
             updateGameState('game-over');
             setFilledFinger(null);
+            setFakeSignal(null);
             setHasTouchedToStart({ left: false, right: false });
             touchHeldRef.current = { left: false, right: false };
           });
         }, roundDeadlineRef.current);
       });
-    }, createRandomWait());
+    }, realSignalDelayMs);
   };
 
   const handlePressIn = (finger: Finger) => {
@@ -117,13 +148,14 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
     if (stateAtRelease === 'idle') return;
 
-    if (stateAtRelease === 'waiting') {
+    if (isReleaseBeforeRealSignal(stateAtRelease)) {
       timersRef.current.invalidate();
       setFailureReason(
         cancelled ? 'Hold interrupted before GO.' : 'False start — released before GO.'
       );
       updateGameState('game-over');
       setFilledFinger(null);
+      setFakeSignal(null);
       return;
     }
 
@@ -135,6 +167,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFailureReason('Wrong finger — release only the white target.');
       updateGameState('game-over');
       setFilledFinger(null);
+      setFakeSignal(null);
       return;
     }
 
@@ -146,6 +179,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFailureReason('Too slow — released after the deadline.');
       updateGameState('game-over');
       setFilledFinger(null);
+      setFakeSignal(null);
       return;
     }
 
@@ -154,6 +188,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       previous === null ? result.reactionTime : Math.min(previous, result.reactionTime)
     );
     setFilledFinger(null);
+    setFakeSignal(null);
     updateGameState('reaction-done');
 
     const transitionId = timersRef.current.beginRound();
@@ -181,6 +216,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
         setDifficulty={(difficulty) => setSetting('difficulty', difficulty)}
         levels={difficultyLevels}
         failureReason={failureReason}
+        fakeSignal={fakeSignal}
       />
     </View>
   );

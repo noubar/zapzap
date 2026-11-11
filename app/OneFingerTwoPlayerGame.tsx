@@ -6,6 +6,12 @@ import { StyleSheet, View } from 'react-native';
 import OneFingerTwoPlayerContent from '../components/OneFingerTwoPlayerContent';
 import { createRandomWait, evaluateReaction, isHeldAfterInput } from '../gameplay/core';
 import {
+  createFakeSignalSchedule,
+  isReleaseBeforeRealSignal,
+  scheduleFakeSignalEvents,
+  type FakeSignalEvent,
+} from '../gameplay/fakeSignals';
+import {
   applyMatchOutcome,
   areBothPlayersReady,
   createInitialMultiplayerState,
@@ -46,6 +52,7 @@ export default function OneFingerTwoPlayerGameScreen() {
   const [roundDetail, setRoundDetail] = useState('');
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ p1: false, p2: false });
+  const [fakeSignal, setFakeSignal] = useState<FakeSignalEvent | null>(null);
 
   const timersRef = useRef(new RoundTimerManager());
   const activeRoundIdRef = useRef<number | null>(null);
@@ -56,6 +63,7 @@ export default function OneFingerTwoPlayerGameScreen() {
   const roundResultsRef = useRef<MultiplayerRoundResults>(initialMatch.results);
   const gameStateRef = useRef<GameState>('idle');
   const roundResolvedRef = useRef(false);
+  const roundFakeSignalsEnabledRef = useRef(false);
 
   useEffect(() => () => timersRef.current.invalidate(), []);
 
@@ -102,12 +110,14 @@ export default function OneFingerTwoPlayerGameScreen() {
     setRoundWinner('');
     setRoundDetail('');
     setBestReactionTime(null);
+    setFakeSignal(null);
     updateGameState('idle');
   };
 
   const finishRound = (roundId: number) => {
     updateGameState('round-result');
     setIsFilled(false);
+    setFakeSignal(null);
     resetReadiness();
     timersRef.current.schedule(roundId, () => {
       if (gameStateRef.current === 'game-over') return;
@@ -142,6 +152,7 @@ export default function OneFingerTwoPlayerGameScreen() {
       { kind: 'valid', reactionTime }
     );
     replaceRoundResults(results);
+    setFakeSignal(null);
     setBestReactionTime((previous) =>
       previous === null ? reactionTime : Math.min(previous, reactionTime)
     );
@@ -156,6 +167,7 @@ export default function OneFingerTwoPlayerGameScreen() {
     );
     if (results === roundResultsRef.current) return;
     replaceRoundResults(results);
+    setFakeSignal(null);
 
     const settlementId = timersRef.current.beginRound();
     activeRoundIdRef.current = settlementId;
@@ -169,13 +181,27 @@ export default function OneFingerTwoPlayerGameScreen() {
     const roundId = timersRef.current.beginRound();
     activeRoundIdRef.current = roundId;
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     roundResolvedRef.current = false;
     signalTimeRef.current = null;
     replaceRoundResults({ p1: null, p2: null });
     setRoundWinner('');
     setRoundDetail('');
     setIsFilled(false);
+    setFakeSignal(null);
     updateGameState('waiting');
+
+    const realSignalDelayMs = createRandomWait();
+    if (roundFakeSignalsEnabledRef.current) {
+      const schedule = createFakeSignalSchedule(realSignalDelayMs);
+      scheduleFakeSignalEvents(
+        timersRef.current,
+        roundId,
+        schedule.events,
+        setFakeSignal,
+        (event) => setFakeSignal((current) => current?.id === event.id ? null : current)
+      );
+    }
 
     timersRef.current.schedule(roundId, () => {
       if (!areBothPlayersReady({
@@ -183,13 +209,14 @@ export default function OneFingerTwoPlayerGameScreen() {
         p2: [touchHeldRef.current.p2],
       })) return;
 
+      setFakeSignal(null);
       setIsFilled(true);
       timersRef.current.scheduleFrame(roundId, (frameTime) => {
         const signal = createSharedSignal(frameTime);
         signalTimeRef.current = signal.signalTime;
         updateGameState('zap');
 
-        if (settings.hapticsEnabled) {
+        if (settings.hapticsEnabled && !roundFakeSignalsEnabledRef.current) {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
         }
 
@@ -209,7 +236,7 @@ export default function OneFingerTwoPlayerGameScreen() {
           });
         }, roundDeadlineRef.current);
       });
-    }, createRandomWait());
+    }, realSignalDelayMs);
   };
 
   const onPlayerPressIn = (player: Player) => {
@@ -233,7 +260,7 @@ export default function OneFingerTwoPlayerGameScreen() {
     if (stateAtRelease === 'idle' || stateAtRelease === 'round-result' || stateAtRelease === 'game-over') return;
     if (roundResultsRef.current[player] !== null) return;
 
-    if (stateAtRelease === 'waiting') {
+    if (isReleaseBeforeRealSignal(stateAtRelease)) {
       recordFailureAndSettle(player, cancelled ? 'cancelled' : 'false-start');
       return;
     }
@@ -277,6 +304,7 @@ export default function OneFingerTwoPlayerGameScreen() {
         resetGame={resetGame}
         router={router}
         hasTouchedToStart={hasTouchedToStart}
+        fakeSignal={fakeSignal}
       />
     </View>
   );
