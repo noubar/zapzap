@@ -1,71 +1,55 @@
-// TwoVsTwoGameContent.tsx
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { Router } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
+
+import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import GameResultScreen from './GameResultScreen';
 
 type Player = 'p1' | 'p2';
 type BoxIndex = 0 | 1;
 
-interface TwoFingerTwoPlayerContent {
+interface TwoFingerTwoPlayerContentProps {
   targets: { p1: number | null; p2: number | null };
   lives: { p1: number; p2: number };
   onBoxPressIn: (player: Player, index: BoxIndex) => void;
   onBoxPressOut: (player: Player, index: BoxIndex, releaseTime: number, cancelled: boolean) => void;
   roundWinner: string;
+  roundDetail: string;
   gameState: 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
   reactionTimes: { p1: number | null; p2: number | null };
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: any;
+  router: Router;
   hasTouchedToStart: { p1: boolean; p2: boolean };
 }
 
-export default function TwoVsTwoGameContent(props: TwoFingerTwoPlayerContent) {
-  const {
-    targets,
-    lives,
-    onBoxPressIn,
-    onBoxPressOut,
-    roundWinner,
-    gameState,
-    reactionTimes,
-    bestReactionTime,
-    resetGame,
-    router,
-    hasTouchedToStart,
-  } = props;
-
+export default function TwoFingerTwoPlayerContent({
+  targets, lives, onBoxPressIn, onBoxPressOut, roundWinner, roundDetail,
+  gameState, reactionTimes, bestReactionTime, resetGame, router, hasTouchedToStart,
+}: TwoFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
+    const isDraw = roundWinner === 'Draw';
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultText}>
-          {roundWinner === 'Draw' ? 'Draw!' : `${roundWinner} Wins!`}
-        </Text>
-        <Text style={styles.resultText}>
-          P1 Lives: {lives.p1} — P2 Lives: {lives.p2}
-        </Text>
-        <Text style={[styles.smallText, { marginTop: 10 }]}>
-          Best Reaction:{' '}
-          {bestReactionTime !== null ? `${bestReactionTime.toFixed(2)} ms` : '---'}
-        </Text>
-
-        <View style={{ height: 16 }} />
-
-        <Text style={styles.button} onPress={resetGame}>
-          Play Again
-        </Text>
-        <Text style={styles.button} onPress={() => router.push('/')}
-        >
-          Main Menu
-        </Text>
-      </View>
+      <GameResultScreen
+        title={isDraw ? 'DRAW' : `${roundWinner.toUpperCase()} WINS`}
+        message={isDraw ? 'Both players are out of lives.' : 'MATCH COMPLETE'}
+        tone={isDraw ? 'draw' : 'victory'}
+        stats={[
+          { label: 'Player 1 lives', value: String(lives.p1), accent: 'player1' },
+          { label: 'Player 2 lives', value: String(lives.p2), accent: 'player2' },
+          { label: 'Best reaction', value: formatReactionTime(bestReactionTime) },
+        ]}
+        onPlayAgain={resetGame}
+        onMainMenu={() => router.push('/')}
+      />
     );
   }
 
   const renderBox = (player: Player, index: BoxIndex) => {
     const isTarget = targets[player] === index && gameState === 'zap';
-
+    const playerNumber = player === 'p1' ? 1 : 2;
     const gesture = Gesture.LongPress()
       .minDuration(0)
       .shouldCancelWhenOutside(false)
@@ -76,202 +60,97 @@ export default function TwoVsTwoGameContent(props: TwoFingerTwoPlayerContent) {
 
     return (
       <GestureDetector gesture={gesture} key={`${player}-${index}`}>
-        <View style={[styles.box, isTarget && styles.targetBox]}>
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`Player ${playerNumber} ${index === 0 ? 'left' : 'right'} reaction button${isTarget ? ', GO now' : ''}`}
+          accessibilityHint="Hold both buttons. Release this button only if it turns white."
+          style={[styles.box, hasTouchedToStart[player] && styles.held, isTarget && styles.targetBox]}
+        >
           <Text style={[styles.boxLabel, isTarget && styles.boxLabelOnTarget]}>
-            {index === 0 ? 'L' : 'R'}
+            {isTarget ? 'GO!' : index === 0 ? 'L' : 'R'}
           </Text>
         </View>
       </GestureDetector>
     );
   };
 
+  const renderPlayer = (player: Player, top: boolean) => {
+    const playerNumber = player === 'p1' ? 1 : 2;
+    const playerWon = gameState === 'round-result' && roundWinner === `Player ${playerNumber}`;
+    const draw = gameState === 'round-result' && (roundWinner === 'Draw' || roundWinner.includes('draw'));
+    return (
+      <View style={[styles.playerArea, top ? styles.playerAreaTop : styles.playerAreaBottom, top && styles.rotated]}>
+        <View style={styles.boxRow}>{renderBox(player, 0)}{renderBox(player, 1)}</View>
+        <View style={[
+          styles.labelBlock,
+          gameState === 'round-result' && !draw && (playerWon ? styles.successPanel : styles.failurePanel),
+          draw && styles.drawPanel,
+        ]}>
+          <Text style={[styles.playerLabel, player === 'p1' ? styles.p1 : styles.p2]}>PLAYER {playerNumber}</Text>
+          <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>LIVES {lives[player]}</Text>
+          <Text style={styles.readyText}>{playerWon ? 'ROUND WIN' : hasTouchedToStart[player] ? 'READY' : 'HOLD BOTH'}</Text>
+          {reactionTimes[player] !== null && <Text style={styles.reactionText}>{formatReactionTime(reactionTimes[player])}</Text>}
+        </View>
+      </View>
+    );
+  };
+
+  const status = gameState === 'round-result'
+    ? roundWinner.toUpperCase()
+    : gameState === 'zap'
+      ? 'GO!'
+      : hasTouchedToStart.p1 && hasTouchedToStart.p2
+        ? 'KEEP HOLDING'
+        : 'GET READY';
+
   return (
     <GestureHandlerRootView style={styles.screen} onStartShouldSetResponder={() => true}>
-      {/* TOP: Player 2 Status */}
-      <Text style={[styles.smallTextTop, { textAlign: 'center', marginTop: 8 }]}>
-        {hasTouchedToStart.p2 ? 'WAITING...' : 'TOUCH & HOLD BOTH BOXES TO START'}
-      </Text>
-
-      {/* TOP: Player 2 Boxes */}
-      <View style={[styles.rectangle, styles.rectangleTop]}>
-        <View style={styles.boxRow}>
-          {renderBox('p2', 0)}
-          {renderBox('p2', 1)}
+      <SafeAreaView style={styles.playArea} edges={['top', 'bottom']}>
+        {renderPlayer('p2', true)}
+        <View pointerEvents="none" style={styles.centerStatus}>
+          <Text accessibilityLiveRegion="polite" style={[styles.statusTop, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
+          {roundDetail ? <Text style={styles.detailTop}>{roundDetail}</Text> : null}
+          <Text accessibilityLiveRegion="polite" style={[styles.status, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
+          {roundDetail ? <Text style={styles.detail}>{roundDetail}</Text> : null}
         </View>
-        <View style={styles.labelBlock}>
-          <Text style={styles.playerLabel}>PLAYER 2</Text>
-          <Text style={styles.livesText}>❤️ {lives.p2}</Text>
-          <Text style={styles.reactionText}>
-            {reactionTimes.p2 !== null ? `${reactionTimes.p2.toFixed(2)} ms` : ''}
-          </Text>
-        </View>
-      </View>
-
-      {/* CENTER STATUS */}
-      <Text style={styles.statusTextTop}>{gameState.toUpperCase()}</Text>
-      <Text style={styles.statusText}>{gameState.toUpperCase()}</Text>
-
-      {/* BOTTOM: Player 1 Boxes */}
-      <View style={[styles.rectangle, styles.rectangleBottom]}>
-        <View style={styles.boxRow}>
-          {renderBox('p1', 0)}
-          {renderBox('p1', 1)}
-        </View>
-        <View style={styles.labelBlock}>
-          <Text style={styles.playerLabel}>PLAYER 1</Text>
-          <Text style={styles.livesText}>❤️ {lives.p1}</Text>
-          <Text style={styles.reactionText}>
-            {reactionTimes.p1 !== null ? `${reactionTimes.p1.toFixed(2)} ms` : ''}
-          </Text>
-        </View>
-      </View>
-
-      {/* BOTTOM: Player 1 Status */}
-      <Text style={[styles.smallTextBottom, { textAlign: 'center', marginBottom: 8 }]}>
-        {hasTouchedToStart.p1 ? 'WAITING...' : 'TOUCH & HOLD BOTH BOXES TO START'}
-      </Text>
+        {renderPlayer('p1', false)}
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: 'black',
-  },
-  rectangle: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-
-  },
-  rectangleTop: {
-    top: '4%',
-    transform: [{ rotate: '180deg' }],
-  },
-  rectangleBottom: {
-    bottom: '6%',
-  },
-  boxRow: {
-    width: '90%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
+  screen: { flex: 1, backgroundColor: arcadeColors.background },
+  playArea: { flex: 1, width: '100%' },
+  playerArea: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  playerAreaTop: { top: '4%' },
+  playerAreaBottom: { bottom: '6%' },
+  rotated: { transform: [{ rotate: '180deg' }] },
+  boxRow: { width: '90%', flexDirection: 'row', justifyContent: 'space-between', gap: arcadeMetrics.spacing.md },
   box: {
-    flex: 1,
-    aspectRatio: 1,
-    borderWidth: 5,
-    borderColor: 'white',
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, aspectRatio: 1, borderWidth: arcadeMetrics.borderWidth,
+    borderColor: arcadeColors.outline, borderRadius: arcadeMetrics.radius,
+    backgroundColor: arcadeColors.surface, alignItems: 'center', justifyContent: 'center',
   },
-  targetBox: {
-    backgroundColor: 'white',
-  },
-  boxLabel: {
-    color: 'white',
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  boxLabelOnTarget: {
-    color: 'black',
-  },
-  labelBlock: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  livesText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  playerLabel: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  reactionText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  statusText: {
-    position: 'absolute',
-    top: '50%',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    zIndex: 10,
-  },
-  statusTextTop: {
-    position: 'absolute',
-    top: '48%',
-    left: 0,
-    right: 0,
-    alignSelf: 'center',
-    textAlign: 'center',
-    transform: [{ rotate: '180deg' }],
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    zIndex: 10,
-  },
-  smallTextTop: {
-    position: 'absolute',
-    top: '3%',
-    alignSelf: 'center',
-    transform: [{ rotate: '180deg' }],
-    color: 'white',
-    fontSize: 14,
-  },
-  smallTextBottom: {
-    position: 'absolute',
-    top: '93%',
-    alignSelf: 'center',
-    color: 'white',
-    fontSize: 14,
-  },
-  resultContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: 'black',
-    width: '100%',
-    height: '100%',
-  },
-  resultText: {
-    color: 'white',
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  button: {
-    marginTop: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: 'white',
-    color: 'black',
-    borderRadius: 8,
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 16,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    width: 180,
-  },
-  smallText: {
-    color: 'white',
-    fontSize: 14,
-  },
+  held: { backgroundColor: arcadeColors.surfaceHeld },
+  targetBox: { backgroundColor: arcadeColors.signal, borderColor: arcadeColors.signal },
+  boxLabel: { ...arcadeTypography.heading, color: arcadeColors.textMuted, fontSize: 25 },
+  boxLabelOnTarget: { color: arcadeColors.signalText },
+  labelBlock: { alignItems: 'center', justifyContent: 'center', marginTop: 4, paddingHorizontal: 16, borderRadius: arcadeMetrics.radiusSmall },
+  successPanel: { backgroundColor: arcadeColors.success },
+  failurePanel: { backgroundColor: arcadeColors.failure },
+  drawPanel: { borderWidth: 2, borderColor: arcadeColors.victory },
+  playerLabel: { ...arcadeTypography.eyebrow, fontSize: 15 },
+  livesText: { ...arcadeTypography.body, fontWeight: '800' },
+  p1: { color: arcadeColors.player1 },
+  p2: { color: arcadeColors.player2 },
+  readyText: { ...arcadeTypography.eyebrow, marginTop: 2 },
+  reactionText: { ...arcadeTypography.body, color: arcadeColors.success, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  centerStatus: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  status: { ...arcadeTypography.heading, position: 'absolute', top: '50%', textAlign: 'center' },
+  statusTop: { ...arcadeTypography.heading, position: 'absolute', bottom: '50%', textAlign: 'center', transform: [{ rotate: '180deg' }] },
+  detail: { ...arcadeTypography.eyebrow, position: 'absolute', top: '54%', color: arcadeColors.failure },
+  detailTop: { ...arcadeTypography.eyebrow, position: 'absolute', bottom: '54%', color: arcadeColors.failure, transform: [{ rotate: '180deg' }] },
+  resultStatus: { color: arcadeColors.victory },
 });

@@ -32,6 +32,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ left: false, right: false });
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+  const [failureReason, setFailureReason] = useState('Round ended.');
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
@@ -60,6 +61,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
     touchHeldRef.current = { left: false, right: false };
     targetFingerRef.current = null;
     startTimeRef.current = null;
+    setFailureReason('Round ended.');
   };
 
   const startRound = () => {
@@ -86,6 +88,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
         timersRef.current.schedule(roundId, () => {
           timersRef.current.scheduleFrame(roundId, () => {
             if (gameStateRef.current !== 'zap') return;
+            setFailureReason('Timeout — the target finger was held past the deadline.');
             updateGameState('game-over');
             setFilledFinger(null);
             setHasTouchedToStart({ left: false, right: false });
@@ -118,6 +121,9 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
     if (stateAtRelease === 'waiting') {
       timersRef.current.invalidate();
+      setFailureReason(
+        cancelled ? 'Hold interrupted before GO.' : 'False start — released before GO.'
+      );
       updateGameState('game-over');
       setFilledFinger(null);
       return;
@@ -128,6 +134,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
     const target = targetFingerRef.current;
     if (target === null || !isCorrectTarget(target, finger)) {
       timersRef.current.invalidate();
+      setFailureReason('Wrong finger — release only the white target.');
       updateGameState('game-over');
       setFilledFinger(null);
       return;
@@ -138,6 +145,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
     timersRef.current.invalidate();
 
     if (result.kind !== 'valid') {
+      setFailureReason('Too slow — released after the deadline.');
       updateGameState('game-over');
       setFilledFinger(null);
       return;
@@ -174,6 +182,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
         difficulty={difficulty}
         setDifficulty={setDifficulty}
         levels={difficultyLevels}
+        failureReason={failureReason}
       />
     </View>
   );

@@ -1,13 +1,19 @@
 import { router } from 'expo-router';
 import { User, Users, Vibrate } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+  arcadeColors,
+  arcadeMetrics,
+  arcadeTypography,
+} from '../constants/ArcadeTheme';
 import { useGlobalSettings } from './GlobalSettings';
 
 export default function MenuScreen() {
   const [fingerMode, setFingerMode] = useState<1 | 2>(1);
   const { settings, setSetting } = useGlobalSettings();
-  const vibrationEnabled = settings.vibrationEnabled;
 
   const menuOptions = useMemo(
     () => [
@@ -15,31 +21,31 @@ export default function MenuScreen() {
         id: 'single-1',
         label: 'Single Player',
         subtext: 'Test your reaction time',
-        icon: <User size={40} color="#fff" />,
+        icon: <User size={34} color={arcadeColors.text} />,
         onPress: () => router.push('/OneFingerSinglePlayerGame'),
         fingerMode: 1 as const,
       },
       {
         id: 'single-2',
-        label: 'Single Player - 2 Fingers',
-        subtext: 'Test your reaction time with two fingers',
-        icon: <User size={40} color="#fff" />,
+        label: 'Single Player',
+        subtext: 'Two-finger target challenge',
+        icon: <User size={34} color={arcadeColors.text} />,
         onPress: () => router.push('/TwoFingerSinglePlayerGame'),
         fingerMode: 2 as const,
       },
       {
         id: 'two-1',
         label: 'Two Players',
-        subtext: 'Classic (one box per player)',
-        icon: <Users size={40} color="#fff" />,
+        subtext: 'One button per player',
+        icon: <Users size={34} color={arcadeColors.text} />,
         onPress: () => router.push('/OneFingerTwoPlayerGame'),
         fingerMode: 1 as const,
       },
       {
         id: 'two-2',
-        label: 'Two Players - 2 Fingers',
-        subtext: 'Each player holds two boxes',
-        icon: <Users size={40} color="#fff" />,
+        label: 'Two Players',
+        subtext: 'Two target buttons per player',
+        icon: <Users size={34} color={arcadeColors.text} />,
         onPress: () => router.push('/TwoFingerTwoPlayerGame'),
         fingerMode: 2 as const,
       },
@@ -53,211 +59,257 @@ export default function MenuScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.vibrationToggle}
-        onPress={() => setSetting('vibrationEnabled', !vibrationEnabled)}
-        accessibilityRole="radio"
-        accessibilityState={{ checked: vibrationEnabled }}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Vibrate size={16} color={vibrationEnabled ? '#22c55e' : '#9ca3af'} />
-        <Text style={styles.vibrationLabel}>Vibration</Text>
-        <View style={styles.radioOuter}>
-          {vibrationEnabled ? <View style={styles.radioInner} /> : null}
+        <View style={styles.content}>
+          <View style={styles.utilityRow}>
+            <Pressable
+              style={({ pressed }) => [styles.vibrationToggle, pressed && styles.pressed]}
+              onPress={() => setSetting('vibrationEnabled', !settings.vibrationEnabled)}
+              accessibilityRole="switch"
+              accessibilityLabel="Vibration feedback"
+              accessibilityState={{ checked: settings.vibrationEnabled }}
+            >
+              <Vibrate
+                size={18}
+                color={settings.vibrationEnabled ? arcadeColors.success : arcadeColors.textMuted}
+              />
+              <Text style={styles.vibrationLabel}>
+                HAPTICS {settings.vibrationEnabled ? 'ON' : 'OFF'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.brand}>
+            <Text style={arcadeTypography.eyebrow}>REACTION ARCADE</Text>
+            <Text accessibilityRole="header" style={styles.title}>ZAPZAP</Text>
+            <Text style={styles.subtitle}>Hold. Wait for white. Release fast.</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>CONTROL MODE</Text>
+            <View style={styles.switchContainer}>
+              {[1, 2].map((mode) => {
+                const selected = fingerMode === mode;
+                return (
+                  <Pressable
+                    key={mode}
+                    style={({ pressed }) => [
+                      styles.switchButton,
+                      selected && styles.switchButtonActive,
+                      pressed && styles.pressed,
+                    ]}
+                    onPress={() => setFingerMode(mode as 1 | 2)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={mode + ' finger mode'}
+                    accessibilityState={{ checked: selected }}
+                  >
+                    <Text
+                      style={[
+                        styles.switchButtonText,
+                        selected && styles.switchButtonTextActive,
+                      ]}
+                    >
+                      {mode} FINGER{mode === 2 ? 'S' : ''}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            {visibleOptions.map((option) => (
+              <Pressable
+                key={option.id}
+                style={({ pressed }) => [styles.menuButton, pressed && styles.menuButtonPressed]}
+                onPress={option.onPress}
+                accessibilityRole="button"
+                accessibilityLabel={option.label + '. ' + option.subtext}
+              >
+                {option.icon}
+                <View style={styles.menuCopy}>
+                  <Text style={styles.buttonText}>{option.label}</Text>
+                  <Text style={styles.buttonSubtext}>{option.subtext}</Text>
+                </View>
+                <Text style={styles.arrow}>›</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.ruleCard}>
+            <Text style={styles.ruleTitle}>THE RULE</Text>
+            <Text style={styles.instructions}>
+              Keep holding through the random wait. Release only when the box turns white.
+            </Text>
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.tutorialButton, pressed && styles.pressed]}
+            onPress={() => router.push('/tutorial')}
+            accessibilityRole="button"
+            accessibilityLabel="Open how to play tutorial"
+          >
+            <Text style={styles.tutorialText}>HOW TO PLAY</Text>
+          </Pressable>
         </View>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Zap Zap</Text>
-      <Text style={styles.title}>A Reaction Game</Text>
-      <Text style={styles.subtitle}>Choose Game Mode</Text>
-
-      <View style={styles.switchContainer}>
-        <TouchableOpacity
-          style={[
-            styles.switchButton,
-            fingerMode === 1 && styles.switchButtonActive,
-          ]}
-          onPress={() => setFingerMode(1)}
-          accessibilityRole="button"
-          accessibilityState={{ selected: fingerMode === 1 }}
-        >
-          <Text
-            style={[
-              styles.switchButtonText,
-              fingerMode === 1 && styles.switchButtonTextActive,
-            ]}
-          >
-            1 Finger
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.switchButton,
-            fingerMode === 2 && styles.switchButtonActive,
-          ]}
-          onPress={() => setFingerMode(2)}
-          accessibilityRole="button"
-          accessibilityState={{ selected: fingerMode === 2 }}
-        >
-          <Text
-            style={[
-              styles.switchButtonText,
-              fingerMode === 2 && styles.switchButtonTextActive,
-            ]}
-          >
-            2 Fingers
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.buttonContainer}>
-        {visibleOptions.map((option) => (
-          <TouchableOpacity
-            key={option.id}
-            style={styles.menuButton}
-            onPress={option.onPress}
-          >
-            {option.icon}
-            <Text style={styles.buttonText}>{option.label}</Text>
-            <Text style={styles.buttonSubtext}>{option.subtext}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.instructions}>
-        HOW TO PLAY: Hold the rectangle until it fills white, then release as fast as you can!
-      </Text>
-
-      <TouchableOpacity style={styles.tutorialButton} onPress={() => router.push('/tutorial')}>
-        <Text style={styles.tutorialText}>Tutorial</Text>
-      </TouchableOpacity>
-    </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: arcadeColors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: arcadeMetrics.spacing.md,
+    paddingVertical: arcadeMetrics.spacing.md,
+  },
+  content: {
+    width: '100%',
+    maxWidth: arcadeMetrics.maxContentWidth,
+  },
+  utilityRow: {
+    minHeight: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   vibrationToggle: {
-    position: 'absolute',
-    top: 54,
-    right: 18,
-    zIndex: 10,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: arcadeMetrics.spacing.sm,
+    paddingHorizontal: arcadeMetrics.spacing.sm,
   },
   vibrationLabel: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+    ...arcadeTypography.eyebrow,
+    color: arcadeColors.text,
+    letterSpacing: 1,
   },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: '#fff',
+  brand: {
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: '#22c55e',
+    paddingVertical: arcadeMetrics.spacing.lg,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
+    ...arcadeTypography.title,
+    marginTop: arcadeMetrics.spacing.sm,
+    fontSize: 44,
+    letterSpacing: 4,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
-    color: '#ccc',
-    marginBottom: 24,
+    ...arcadeTypography.body,
+    marginTop: arcadeMetrics.spacing.sm,
+    color: arcadeColors.textMuted,
     textAlign: 'center',
   },
+  section: {
+    marginBottom: arcadeMetrics.spacing.md,
+  },
+  sectionLabel: {
+    ...arcadeTypography.eyebrow,
+    marginBottom: arcadeMetrics.spacing.sm,
+  },
   switchContainer: {
-    width: '100%',
+    minHeight: 48,
     flexDirection: 'row',
     borderWidth: 2,
-    borderColor: '#fff',
-    borderRadius: 999,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radiusSmall,
     overflow: 'hidden',
-    marginBottom: 30,
   },
   switchButton: {
     flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: arcadeColors.surface,
   },
   switchButtonActive: {
-    backgroundColor: '#fff',
+    backgroundColor: arcadeColors.outline,
   },
   switchButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    ...arcadeTypography.caption,
+    color: arcadeColors.text,
+    fontWeight: '900',
   },
   switchButtonTextActive: {
-    color: '#000',
+    color: arcadeColors.signalText,
   },
   buttonContainer: {
-    width: '100%',
-    gap: 20,
-    marginBottom: 40,
+    gap: arcadeMetrics.spacing.sm,
   },
   menuButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 3,
-    borderColor: '#fff',
-    borderRadius: 15,
-    padding: 30,
+    minHeight: 96,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 120,
+    gap: arcadeMetrics.spacing.md,
+    paddingHorizontal: arcadeMetrics.spacing.md,
+    borderWidth: arcadeMetrics.borderWidth,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radius,
+    backgroundColor: arcadeColors.surface,
+  },
+  menuButtonPressed: {
+    backgroundColor: arcadeColors.surfaceHeld,
+  },
+  menuCopy: {
+    flex: 1,
   },
   buttonText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 10,
-    textAlign: 'center',
+    ...arcadeTypography.heading,
+    fontSize: 20,
   },
   buttonSubtext: {
-    fontSize: 14,
-    color: '#ccc',
-    marginTop: 5,
-    textAlign: 'center',
+    ...arcadeTypography.caption,
+    marginTop: arcadeMetrics.spacing.xs,
+    letterSpacing: 0,
+    textTransform: 'none',
+  },
+  arrow: {
+    color: arcadeColors.text,
+    fontSize: 34,
+    fontWeight: '300',
+  },
+  ruleCard: {
+    marginTop: arcadeMetrics.spacing.md,
+    padding: arcadeMetrics.spacing.md,
+    borderLeftWidth: arcadeMetrics.borderWidth,
+    borderLeftColor: arcadeColors.success,
+    backgroundColor: arcadeColors.surface,
+  },
+  ruleTitle: {
+    ...arcadeTypography.eyebrow,
+    color: arcadeColors.success,
   },
   instructions: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: 300,
-    marginBottom: 18,
+    ...arcadeTypography.body,
+    marginTop: arcadeMetrics.spacing.sm,
+    color: arcadeColors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
   },
   tutorialButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: arcadeMetrics.spacing.md,
     borderWidth: 2,
-    borderColor: '#fff',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 30,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radiusSmall,
   },
   tutorialText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    ...arcadeTypography.body,
+    fontWeight: '900',
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

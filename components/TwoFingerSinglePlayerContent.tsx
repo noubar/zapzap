@@ -1,12 +1,16 @@
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { Router } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
+
+import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
 import DifficultySelector from './DifficultySelector';
+import GameResultScreen from './GameResultScreen';
 
 type Finger = 'left' | 'right';
 
-interface TwoFingerSinglePlayerContent {
+interface TwoFingerSinglePlayerContentProps {
   filledFinger: Finger | null;
   onFingerPressIn: (finger: Finger) => void;
   onFingerPressOut: (finger: Finger, releaseTime: number, cancelled: boolean) => void;
@@ -14,229 +18,155 @@ interface TwoFingerSinglePlayerContent {
   reactionTime: number;
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: any;
+  router: Router;
   zapsAvoided: number;
   hasTouchedToStart: { left: boolean; right: boolean };
   difficulty: 'easy' | 'medium' | 'hard';
   setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
   levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
+  failureReason: string;
 }
 
-export default function TwoFingerSinglePlayerContent(
-  props: TwoFingerSinglePlayerContent
-) {
-  const {
-    filledFinger,
-    onFingerPressIn,
-    onFingerPressOut,
-    gameState,
-    reactionTime,
-    bestReactionTime,
-    resetGame,
-    router,
-    zapsAvoided,
-    hasTouchedToStart,
-    difficulty,
-    setDifficulty,
-    levels: difficultyLevels,
-  } = props;
-
+export default function TwoFingerSinglePlayerContent({
+  filledFinger, onFingerPressIn, onFingerPressOut, gameState, reactionTime,
+  bestReactionTime, resetGame, router, zapsAvoided, hasTouchedToStart,
+  difficulty, setDifficulty, levels, failureReason,
+}: TwoFingerSinglePlayerContentProps) {
   const hasBothTouched = hasTouchedToStart.left && hasTouchedToStart.right;
+  const isSuccess = gameState === 'reaction-done';
 
   if (gameState === 'game-over') {
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultText}>Game Over!</Text>
-        <Text style={styles.resultText}>Zaps Avoided: {zapsAvoided}</Text>
-        <Text style={styles.resultText}>
-          Best Reaction: {bestReactionTime !== null ? `${bestReactionTime.toFixed(2)} ms` : '---'}
-        </Text>
-        <Text style={styles.button} onPress={resetGame}>
-          Play Again
-        </Text>
-        <Text style={styles.button} onPress={() => router.push('/')}>
-          Main Menu
-        </Text>
-      </View>
+      <GameResultScreen
+        title="RUN OVER"
+        message={failureReason}
+        tone="failure"
+        stats={[
+          { label: 'Zaps avoided', value: String(zapsAvoided), accent: 'success' },
+          { label: 'Best reaction', value: formatReactionTime(bestReactionTime) },
+        ]}
+        onPlayAgain={resetGame}
+        onMainMenu={() => router.push('/')}
+      />
     );
   }
 
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Text style={styles.statusText}>
-        {hasBothTouched ? 'WAITING' : 'TOUCH BOTH TO START'}
-      </Text>
-      <View style={styles.difficultyWrapper}>
-        <DifficultySelector
-          difficulty={difficulty}
-          setDifficulty={setDifficulty}
-          hasTouchedToStart={hasBothTouched}
-          levels={difficultyLevels}
-        />
-      </View>
+  const status = gameState === 'zap'
+    ? 'GO!'
+    : isSuccess
+      ? 'SUCCESS'
+      : hasBothTouched
+        ? 'KEEP HOLDING'
+        : 'TOUCH BOTH';
 
-      <View style={styles.rectRow}>
-        <GestureDetector
-          gesture={Gesture.LongPress()
-            .minDuration(0)
-            .shouldCancelWhenOutside(false)
-            .onStart(() => scheduleOnRN(onFingerPressIn, 'left'))
-            .onEnd((_, success) =>
-              scheduleOnRN(onFingerPressOut, 'left', performance.now(), !success)
-            )}
+  const renderFinger = (finger: Finger) => {
+    const isTarget = filledFinger === finger;
+    const isHeld = hasTouchedToStart[finger] && !isTarget && !isSuccess;
+    const gesture = Gesture.LongPress()
+      .minDuration(0)
+      .shouldCancelWhenOutside(false)
+      .onStart(() => scheduleOnRN(onFingerPressIn, finger))
+      .onEnd((_, success) =>
+        scheduleOnRN(onFingerPressOut, finger, performance.now(), !success)
+      );
+
+    return (
+      <GestureDetector gesture={gesture} key={finger}>
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`${finger} reaction button${isTarget ? ', GO now' : ''}`}
+          accessibilityHint="Touch and hold. Release this finger only if its button turns white."
+          style={[
+            styles.rectangle,
+            isHeld && styles.held,
+            isSuccess && styles.successBox,
+            isTarget && styles.filled,
+          ]}
         >
-          <View style={[styles.rectangle, filledFinger === 'left' && styles.filled]}>
-            <Text style={[styles.fingerLabel, filledFinger === 'left' && styles.fingerLabelFilled]}>
-              LEFT
-            </Text>
-          </View>
-        </GestureDetector>
-
-        <GestureDetector
-          gesture={Gesture.LongPress()
-            .minDuration(0)
-            .shouldCancelWhenOutside(false)
-            .onStart(() => scheduleOnRN(onFingerPressIn, 'right'))
-            .onEnd((_, success) =>
-              scheduleOnRN(onFingerPressOut, 'right', performance.now(), !success)
-            )}
-        >
-          <View style={[styles.rectangle, filledFinger === 'right' && styles.filled]}>
-            <Text style={[styles.fingerLabel, filledFinger === 'right' && styles.fingerLabelFilled]}>
-              RIGHT
-            </Text>
-          </View>
-        </GestureDetector>
-      </View>
-
-      {reactionTime > 0 && (
-        <View style={styles.overlay}>
-          <Text style={styles.overlayText}>{reactionTime.toFixed(2)} ms</Text>
+          <Text style={[styles.fingerLabel, (isTarget || isSuccess) && styles.fingerLabelFilled]}>
+            {isTarget ? 'GO!' : isSuccess ? 'NICE!' : finger.toUpperCase()}
+          </Text>
         </View>
-      )}
+      </GestureDetector>
+    );
+  };
 
-      <View style={styles.zapsAvoided}>
-        <Text style={styles.zapsAvoidedText}>Zaps Avoided: {zapsAvoided}</Text>
-      </View>
-      <View style={styles.bestReaction}>
-        <Text style={styles.bestReactionText}>
-          Best Reaction: {bestReactionTime !== null ? `${bestReactionTime.toFixed(2)} ms` : '---'}
-        </Text>
-      </View>
+  return (
+    <GestureHandlerRootView style={styles.screen}>
+      <SafeAreaView style={styles.playArea} edges={['top', 'bottom']}>
+        <View style={styles.hud}>
+          <Text accessibilityLiveRegion="polite" style={[styles.statusText, isSuccess && styles.successText]}>
+            {status}
+          </Text>
+          <DifficultySelector
+            difficulty={difficulty}
+            setDifficulty={setDifficulty}
+            hasTouchedToStart={hasBothTouched}
+            levels={levels}
+          />
+          <View style={styles.statsRow}>
+            <View>
+              <Text style={styles.statLabel}>ZAPS</Text>
+              <Text style={styles.statValue}>{zapsAvoided}</Text>
+            </View>
+            <View style={styles.statRight}>
+              <Text style={styles.statLabel}>BEST</Text>
+              <Text style={styles.statValue}>{formatReactionTime(bestReactionTime)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {isSuccess && reactionTime > 0 && (
+          <View pointerEvents="none" style={styles.reactionOverlay}>
+            <Text style={styles.reactionLabel}>REACTION</Text>
+            <Text style={styles.reactionTime}>{formatReactionTime(reactionTime)}</Text>
+          </View>
+        )}
+
+        <View style={styles.rectRow}>
+          {renderFinger('left')}
+          {renderFinger('right')}
+        </View>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, width: '100%', backgroundColor: arcadeColors.background },
+  playArea: { flex: 1, width: '100%', alignItems: 'center' },
+  hud: {
+    position: 'absolute', top: arcadeMetrics.spacing.md, left: 0, right: 0,
+    zIndex: 10, alignItems: 'center', gap: arcadeMetrics.spacing.sm,
+  },
+  statusText: { ...arcadeTypography.heading, fontSize: 24, textAlign: 'center' },
+  successText: { color: arcadeColors.success },
+  statsRow: {
+    width: '90%', maxWidth: 520, flexDirection: 'row', justifyContent: 'space-between',
+    marginTop: arcadeMetrics.spacing.xs,
+  },
+  statRight: { alignItems: 'flex-end' },
+  statLabel: { ...arcadeTypography.eyebrow },
+  statValue: { ...arcadeTypography.body, marginTop: 2, fontWeight: '800', fontVariant: ['tabular-nums'] },
   rectRow: {
-    position: 'absolute',
-    bottom: '6%',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: '5%',
-    height: '30%',
+    position: 'absolute', bottom: '6%', left: 0, right: 0, flexDirection: 'row',
+    justifyContent: 'space-between', paddingHorizontal: '5%', height: '30%', gap: arcadeMetrics.spacing.sm,
   },
   rectangle: {
-    width: '48%',
-    height: '100%',
-    borderWidth: 5,
-    borderColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '48%', height: '100%', borderWidth: arcadeMetrics.borderWidth,
+    borderColor: arcadeColors.outline, borderRadius: arcadeMetrics.radius,
+    backgroundColor: arcadeColors.surface, justifyContent: 'center', alignItems: 'center',
   },
-  filled: {
-    backgroundColor: 'white',
-  },
-  fingerLabel: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  fingerLabelFilled: {
-    color: 'black',
-  },
-  resultContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: 'black',
-    width: '100%',
-    height: '100%',
-  },
-  resultText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  button: {
-    marginTop: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    color: 'black',
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 16,
-    overflow: 'hidden',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    top: '-30%',
-  },
-  overlayText: {
-    color: 'white',
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  statusText: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    zIndex: 10,
-  },
-  difficultyWrapper: {
-    position: 'absolute',
-    top: 85,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 15,
-  },
-  zapsAvoided: {
-    position: 'absolute',
-    top: 135,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  zapsAvoidedText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  bestReaction: {
-    position: 'absolute',
-    top: 160,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  bestReactionText: {
-    color: 'white',
-    fontSize: 16,
+  held: { backgroundColor: arcadeColors.surfaceHeld },
+  filled: { backgroundColor: arcadeColors.signal, borderColor: arcadeColors.signal },
+  successBox: { backgroundColor: arcadeColors.success, borderColor: arcadeColors.success },
+  fingerLabel: { ...arcadeTypography.heading, color: arcadeColors.textMuted, fontSize: 19 },
+  fingerLabelFilled: { color: arcadeColors.signalText },
+  reactionOverlay: { position: 'absolute', top: '43%', alignItems: 'center' },
+  reactionLabel: { ...arcadeTypography.eyebrow, color: arcadeColors.success },
+  reactionTime: {
+    ...arcadeTypography.title, marginTop: arcadeMetrics.spacing.xs, color: arcadeColors.success,
+    fontSize: 42, fontVariant: ['tabular-nums'],
   },
 });

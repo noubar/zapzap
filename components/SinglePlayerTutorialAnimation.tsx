@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { arcadeColors, arcadeMetrics, arcadeTypography } from '../constants/ArcadeTheme';
 
 const STEPS = [
   { label: 'Touch & hold the box', status: 'TOUCH & HOLD' },
@@ -113,7 +114,15 @@ export default function SinglePlayerTutorialAnimation() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.statusText}>{step.status}</Text>
+      <Text
+        style={[
+          styles.statusText,
+          stepIndex === 3 && styles.failureText,
+          stepIndex === 2 && styles.signalStatusText,
+        ]}
+      >
+        {step.status}
+      </Text>
 
       <View style={styles.rectangleWrapper}>
         <Animated.View style={[styles.rectangle, { backgroundColor: boxFillColor }]} />
@@ -137,9 +146,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    maxWidth: 480,
   },
   statusText: {
-    color: 'white',
+    ...arcadeTypography.heading,
+    color: arcadeColors.text,
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 18,
@@ -147,39 +158,42 @@ const styles = StyleSheet.create({
   },
   rectangleWrapper: {
     width: '100%',
-    height: 320,
+    height: 270,
     alignItems: 'center',
     justifyContent: 'flex-end',
     position: 'relative',
   },
   rectangle: {
     width: '90%',
-    height: 170,
-    borderRadius: 12,
+    height: 150,
+    borderRadius: arcadeMetrics.radius,
     position: 'absolute',
     bottom: 0,
   },
   rectangleBorder: {
     position: 'absolute',
     width: '90%',
-    height: 170,
-    borderRadius: 12,
-    borderWidth: 5,
-    borderColor: 'white',
+    height: 150,
+    borderRadius: arcadeMetrics.radius,
+    borderWidth: arcadeMetrics.borderWidth,
+    borderColor: arcadeColors.outline,
+    backgroundColor: arcadeColors.surface,
     bottom: 0,
   },
   zapText: {
     position: 'absolute',
-    color: 'black',
+    color: arcadeColors.signalText,
+    fontFamily: 'SpaceMono',
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: 1,
-    bottom: 70,
+    bottom: 62,
   },
   hintText: {
     position: 'absolute',
     bottom: 20,
-    color: 'black',
+    color: arcadeColors.signalText,
+    fontFamily: 'SpaceMono',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -188,15 +202,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
-    bottom: 135,
+    backgroundColor: arcadeColors.text,
+    bottom: 118,
     borderWidth: 3,
-    borderColor: 'black',
+    borderColor: arcadeColors.background,
   },
   stepText: {
     marginTop: 18,
-    color: '#ccc',
+    ...arcadeTypography.body,
+    color: arcadeColors.textMuted,
     fontSize: 16,
     textAlign: 'center',
+  },
+  failureText: {
+    color: arcadeColors.failure,
+  },
+  signalStatusText: {
+    color: arcadeColors.text,
   },
 });

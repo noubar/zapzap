@@ -1,70 +1,115 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import SinglePlayerTutorialAnimation from '../components/SinglePlayerTutorialAnimation';
+import {
+  arcadeColors,
+  arcadeMetrics,
+  arcadeTypography,
+} from '../constants/ArcadeTheme';
 
 export default function TutorialScreen() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>How to Play</Text>
-      <Text style={styles.subtitle}>Single Player Tutorial</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={arcadeTypography.eyebrow}>TRAINING MODE</Text>
+          <Text accessibilityRole="header" style={styles.title}>HOW TO PLAY</Text>
+          <Text style={styles.subtitle}>White is the only GO signal.</Text>
+        </View>
 
-      <SinglePlayerTutorialAnimation />
+        <SinglePlayerTutorialAnimation />
 
-      <View style={styles.instructions}>
-        <Text style={styles.instructionsText}>
-          Hold the box. When it flashes ZAP, lift your finger before the timeout.
-        </Text>
-      </View>
+        <View style={styles.instructions}>
+          <Text style={styles.instructionNumber}>01</Text>
+          <Text style={styles.instructionsText}>Press and keep holding through the random wait.</Text>
+          <Text style={styles.instructionNumber}>02</Text>
+          <Text style={styles.instructionsText}>Release immediately when the box turns white.</Text>
+          <Text style={styles.instructionNumber}>03</Text>
+          <Text style={styles.instructionsText}>Releasing early or after the deadline ends the run.</Text>
+        </View>
 
-      <TouchableOpacity style={styles.button} onPress={() => router.push('/')}>
-        <Text style={styles.buttonText}>Back to Menu</Text>
-      </TouchableOpacity>
-    </View>
+        <Pressable
+          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          onPress={() => router.push('/')}
+          accessibilityRole="button"
+          accessibilityLabel="Back to main menu"
+        >
+          <Text style={styles.buttonText}>BACK TO MENU</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: 'black',
-    alignItems: 'center',
+    backgroundColor: arcadeColors.background,
+  },
+  content: {
+    flexGrow: 1,
+    width: '100%',
+    maxWidth: arcadeMetrics.maxContentWidth,
+    alignSelf: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 30,
-    gap: 18,
+    paddingHorizontal: arcadeMetrics.spacing.md,
+    paddingVertical: arcadeMetrics.spacing.lg,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: arcadeMetrics.spacing.lg,
   },
   title: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: 'bold',
+    ...arcadeTypography.title,
+    marginTop: arcadeMetrics.spacing.sm,
     textAlign: 'center',
   },
   subtitle: {
-    color: '#ccc',
-    fontSize: 16,
+    ...arcadeTypography.body,
+    marginTop: arcadeMetrics.spacing.sm,
+    color: arcadeColors.textMuted,
     textAlign: 'center',
   },
   instructions: {
-    maxWidth: 320,
+    marginTop: arcadeMetrics.spacing.lg,
+    padding: arcadeMetrics.spacing.md,
+    borderWidth: 2,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radius,
+    backgroundColor: arcadeColors.surface,
+    gap: arcadeMetrics.spacing.sm,
+  },
+  instructionNumber: {
+    ...arcadeTypography.eyebrow,
+    color: arcadeColors.success,
   },
   instructionsText: {
-    color: '#888',
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
+    ...arcadeTypography.body,
+    color: arcadeColors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
   },
   button: {
-    marginTop: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 26,
-    borderRadius: 8,
-    backgroundColor: 'white',
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: arcadeMetrics.spacing.lg,
+    borderRadius: arcadeMetrics.radiusSmall,
+    backgroundColor: arcadeColors.outline,
+  },
+  buttonPressed: {
+    opacity: 0.72,
   },
   buttonText: {
-    color: 'black',
-    fontSize: 16,
-    fontWeight: '700',
+    ...arcadeTypography.body,
+    color: arcadeColors.signalText,
+    fontWeight: '900',
   },
 });

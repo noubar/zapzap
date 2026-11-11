@@ -30,6 +30,7 @@ export default function TwoPlayerGameScreen() {
   });
   const [lives, setLives] = useState({ p1: 3, p2: 3 });
   const [roundWinner, setRoundWinner] = useState('');
+  const [roundDetail, setRoundDetail] = useState('');
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ p1: false, p2: false });
 
@@ -79,6 +80,7 @@ export default function TwoPlayerGameScreen() {
     setReactionTimes({ p1: null, p2: null });
     setLives({ p1: 3, p2: 3 });
     setRoundWinner('');
+    setRoundDetail('');
     setBestReactionTime(null);
   };
 
@@ -122,6 +124,7 @@ export default function TwoPlayerGameScreen() {
     reactionTimesRef.current = { p1: null, p2: null };
     setReactionTimes({ p1: null, p2: null });
     setRoundWinner('');
+    setRoundDetail('');
     setIsFilled(false);
     updateGameState('waiting');
 
@@ -144,10 +147,13 @@ export default function TwoPlayerGameScreen() {
             const p2Valid = reactionTimesRef.current.p2 !== null;
 
             if (!p1Valid && !p2Valid) {
+              setRoundDetail('TIMEOUT');
               resolveRound(roundId, 'both', 'Both slow - draw');
             } else if (!p1Valid) {
+              setRoundDetail('PLAYER 1 TOO SLOW');
               resolveRound(roundId, 'p1', 'Player 2');
             } else if (!p2Valid) {
+              setRoundDetail('PLAYER 2 TOO SLOW');
               resolveRound(roundId, 'p2', 'Player 1');
             }
           });
@@ -176,6 +182,7 @@ export default function TwoPlayerGameScreen() {
     }
 
     if (stateAtRelease === 'waiting') {
+      setRoundDetail(cancelled ? 'HOLD INTERRUPTED' : 'FALSE START');
       const roundId = timersRef.current.beginRound();
       roundResolvedRef.current = false;
       resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
@@ -192,6 +199,7 @@ export default function TwoPlayerGameScreen() {
     );
 
     if (evaluation.kind !== 'valid') {
+      setRoundDetail('TOO SLOW');
       roundResolvedRef.current = false;
       resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
       return;
@@ -223,10 +231,13 @@ export default function TwoPlayerGameScreen() {
     roundResolvedRef.current = false;
 
     if (comparison === 'draw') {
+      setRoundDetail('TIED REACTION');
       resolveRound(roundId, 'none', 'Draw');
     } else if (comparison === 'first') {
+      setRoundDetail('FASTER REACTION');
       resolveRound(roundId, other, player === 'p1' ? 'Player 1' : 'Player 2');
     } else {
+      setRoundDetail('FASTER REACTION');
       resolveRound(roundId, player, other === 'p1' ? 'Player 1' : 'Player 2');
     }
   };
@@ -239,6 +250,7 @@ export default function TwoPlayerGameScreen() {
         onPlayerPressIn={onPlayerPressIn}
         onPlayerPressOut={onPlayerPressOut}
         roundWinner={roundWinner}
+        roundDetail={roundDetail}
         gameState={gameState}
         reactionTime={reactionTimes}
         bestReactionTime={bestReactionTime}

@@ -1,220 +1,147 @@
 import { StyleSheet, Text, View } from 'react-native';
+import type { Router } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
+
+import { arcadeColors, arcadeMetrics, arcadeTypography, formatReactionTime } from '../constants/ArcadeTheme';
+import GameResultScreen from './GameResultScreen';
 
 type Player = 'p1' | 'p2';
 
-interface OneFingerTwoPlayerContent {
+interface OneFingerTwoPlayerContentProps {
   isFilled: boolean;
   lives: { p1: number; p2: number };
   onPlayerPressIn: (player: Player) => void;
   onPlayerPressOut: (player: Player, releaseTime: number, cancelled: boolean) => void;
   roundWinner: string;
+  roundDetail: string;
   gameState: 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
   reactionTime: { p1: number | null; p2: number | null };
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: any;
+  router: Router;
   hasTouchedToStart: { p1: boolean; p2: boolean };
 }
 
-export default function TwoPlayerGameContent(props: OneFingerTwoPlayerContent) {
-  const {
-    isFilled,
-    lives,
-    onPlayerPressIn,
-    onPlayerPressOut,
-    roundWinner,
-    gameState,
-    reactionTime,
-    bestReactionTime,
-    resetGame,
-    router,
-    hasTouchedToStart,
-  } = props;
-
+export default function OneFingerTwoPlayerContent({
+  isFilled, lives, onPlayerPressIn, onPlayerPressOut, roundWinner, roundDetail,
+  gameState, reactionTime, bestReactionTime, resetGame, router, hasTouchedToStart,
+}: OneFingerTwoPlayerContentProps) {
   if (gameState === 'game-over') {
+    const isDraw = roundWinner === 'Draw';
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultText}>
-          {roundWinner === 'Draw' ? 'Draw!' : `${roundWinner} Wins!`}
-        </Text>
-
-        <Text style={styles.resultText}>P1 Lives: {lives.p1} — P2 Lives: {lives.p2}</Text>
-
-        <Text style={[styles.smallText, { marginTop: 10 }]}>
-          Best Reaction:{' '}
-          {bestReactionTime !== null ? `${bestReactionTime.toFixed(2)} ms` : '---'}
-        </Text>
-
-        <View style={{ height: 16 }} />
-
-        <Text style={styles.button} onPress={resetGame}>
-          Play Again
-        </Text>
-
-        <Text style={styles.button} onPress={() => router.push('/')}>
-          Main Menu
-        </Text>
-      </View>
+      <GameResultScreen
+        title={isDraw ? 'DRAW' : `${roundWinner.toUpperCase()} WINS`}
+        message={isDraw ? 'Both players are out of lives.' : 'MATCH COMPLETE'}
+        tone={isDraw ? 'draw' : 'victory'}
+        stats={[
+          { label: 'Player 1 lives', value: String(lives.p1), accent: 'player1' },
+          { label: 'Player 2 lives', value: String(lives.p2), accent: 'player2' },
+          { label: 'Best reaction', value: formatReactionTime(bestReactionTime) },
+        ]}
+        onPlayAgain={resetGame}
+        onMainMenu={() => router.push('/')}
+      />
     );
   }
 
+  const gestureFor = (player: Player) => Gesture.LongPress()
+    .minDuration(0)
+    .shouldCancelWhenOutside(false)
+    .onStart(() => scheduleOnRN(onPlayerPressIn, player))
+    .onEnd((_, success) =>
+      scheduleOnRN(onPlayerPressOut, player, performance.now(), !success)
+    );
+
+  const status = gameState === 'round-result'
+    ? roundWinner.toUpperCase()
+    : gameState === 'zap'
+      ? 'GO!'
+      : hasTouchedToStart.p1 && hasTouchedToStart.p2
+        ? 'KEEP HOLDING'
+        : 'GET READY';
+
+  const renderPlayer = (player: Player, top: boolean) => {
+    const playerNumber = player === 'p1' ? 1 : 2;
+    const playerWon = gameState === 'round-result' && roundWinner === `Player ${playerNumber}`;
+    const draw = gameState === 'round-result' && (roundWinner === 'Draw' || roundWinner.includes('draw'));
+    return (
+      <GestureDetector gesture={gestureFor(player)}>
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`Player ${playerNumber} reaction button${isFilled ? ', GO now' : ''}`}
+          accessibilityHint="Touch and hold. Release only when the button turns white and says GO."
+          style={[
+            styles.rectangle,
+            top ? styles.rectangleTop : styles.rectangleBottom,
+            hasTouchedToStart[player] && !isFilled && styles.held,
+            gameState === 'round-result' && !draw && (playerWon ? styles.successBox : styles.failureBox),
+            draw && styles.drawBox,
+            isFilled && styles.filled,
+          ]}
+        >
+          <Text style={[styles.playerLabel, player === 'p1' ? styles.p1 : styles.p2]}>
+            PLAYER {playerNumber}
+          </Text>
+          <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>
+            LIVES {lives[player]}
+          </Text>
+          <Text style={[styles.boxAction, isFilled && styles.boxActionSignal]}>
+            {isFilled ? 'GO!' : playerWon ? 'ROUND WIN' : 'HOLD'}
+          </Text>
+          {reactionTime[player] !== null && (
+            <Text style={styles.reactionText}>{formatReactionTime(reactionTime[player])}</Text>
+          )}
+        </View>
+      </GestureDetector>
+    );
+  };
+
   return (
-    <>
-        <GestureHandlerRootView
-        style={{ flex: 1 }}
-        onStartShouldSetResponder={() => true}
-      >
-        {/* TOP: Player 2 Status */}
-        <Text style={[styles.smallTextTop, { textAlign: 'center', marginTop: 8 }]}>
-          {hasTouchedToStart.p2 ? 'WAITING...' : 'TOUCH & HOLD TO START'}
-        </Text>
-        {/* TOP: Player 2 Box */}
-        <GestureDetector gesture={Gesture.LongPress().minDuration(0).shouldCancelWhenOutside(false).onStart(() => scheduleOnRN(onPlayerPressIn,'p2')).onEnd((_, success) => scheduleOnRN(onPlayerPressOut,'p2', performance.now(), !success))}>
-          <View style={[styles.rectangle, styles.rectangleTop, isFilled && styles.filled]}>
-            <Text style={styles.livesText}>❤️ {lives.p2}</Text>
-            <Text style={styles.playerLabel}>PLAYER 2</Text>
-            <Text style={styles.reactionText}>
-              {reactionTime.p2 !== null ? `${reactionTime.p2.toFixed(2)} ms` : ''}
-            </Text>
-          </View>
-        </GestureDetector>
-
-        {/* CENTER STATUS */}
-        <Text style={styles.statusTextTop}>{gameState.toUpperCase()}</Text>
-        <Text style={styles.statusText}>{gameState.toUpperCase()}</Text>
-
-        <GestureDetector gesture={Gesture.LongPress().minDuration(0).shouldCancelWhenOutside(false).onStart(() => scheduleOnRN(onPlayerPressIn,'p1')).onEnd((_, success) => scheduleOnRN(onPlayerPressOut,'p1', performance.now(), !success))}>
-          <View style={[styles.rectangle, styles.rectangleBottom, isFilled && styles.filled]}>
-            <Text style={styles.livesText}>❤️ {lives.p1}</Text>
-            <Text style={styles.playerLabel}>PLAYER 1</Text>
-            <Text style={styles.reactionText}>
-              {reactionTime.p1 !== null ? `${reactionTime.p1.toFixed(2)} ms` : ''}
-            </Text>
-          </View>
-        </GestureDetector>
-
-        {/* BOTTOM: Player 1 Status */}
-        <Text style={[styles.smallTextButtom, { textAlign: 'center', marginBottom: 8 }]}>
-          {hasTouchedToStart.p1 ? 'WAITING...' : 'TOUCH & HOLD TO START'}
-        </Text>
-
-        </GestureHandlerRootView>
-    </>
+    <GestureHandlerRootView style={styles.screen} onStartShouldSetResponder={() => true}>
+      <SafeAreaView style={styles.playArea} edges={['top', 'bottom']}>
+        {renderPlayer('p2', true)}
+        <View pointerEvents="none" style={styles.centerStatus}>
+          <Text accessibilityLiveRegion="polite" style={[styles.statusTop, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
+          {roundDetail ? <Text style={styles.detailTop}>{roundDetail}</Text> : null}
+          <Text accessibilityLiveRegion="polite" style={[styles.status, gameState === 'round-result' && styles.resultStatus]}>{status}</Text>
+          {roundDetail ? <Text style={styles.detail}>{roundDetail}</Text> : null}
+        </View>
+        {renderPlayer('p1', false)}
+      </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: arcadeColors.background },
+  playArea: { flex: 1, width: '100%' },
   rectangle: {
-    width: '90%',
-    height: '40%',
-    position: 'absolute',
-    borderWidth: 5,
-    borderColor: 'white',
-    alignSelf: 'center',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '90%', height: '40%', position: 'absolute', alignSelf: 'center',
+    borderWidth: arcadeMetrics.borderWidth, borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radius, backgroundColor: arcadeColors.surface,
+    justifyContent: 'center', alignItems: 'center',
   },
-  rectangleTop: {
-    top: '5%',
-    // rotate so text feels oriented for player 2 (optional)
-    transform: [{ rotate: '180deg' }],
-  },
-  rectangleBottom: {
-    bottom: '6%',
-  },
-  filled: {
-    backgroundColor: 'white',
-  },
-  livesText: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    color: 'white',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  playerLabel: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  reactionText: {
-    color: 'white',
-    fontSize: 28,
-    fontWeight: '800',
-    marginTop: 8,
-  },
-  statusText: {
-    position: 'absolute',
-    top: '49%',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    zIndex: 10,
-  },
-  statusTextTop: {
-    position: 'absolute',
-    top: '47%',
-    left: 0,
-    right: 0,
-    alignSelf: 'center',
-    textAlign: 'center',
-    transform : 'rotate(180deg)',
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    zIndex: 10,
-  },
-  resultContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: 'black',
-    width: '100%',
-    height: '100%',
-  },
-  resultText: {
-    color: 'white',
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  button: {
-    marginTop: 18,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: 'white',
-    color: 'black',
-    borderRadius: 8,
-    textAlign: 'center',
-    fontWeight: '700',
-    fontSize: 16,
-    overflow: 'hidden',
-    alignSelf: 'center',
-    width: 180,
-  },
-  smallTextTop: {
-    position: 'absolute',
-    top: '2%',
-    alignSelf: 'center',
-    transform : 'rotate(180deg)',
-    color: 'white',
-    fontSize: 14,
-  },
-  smallTextButtom: {
-    position: 'absolute',
-    top: '95%',
-    alignSelf: 'center',
-    color: 'white',
-    fontSize: 14,
-  },
-    smallText: {
-    color: 'white',
-    fontSize: 14,
-  },
+  rectangleTop: { top: '5%', transform: [{ rotate: '180deg' }] },
+  rectangleBottom: { bottom: '6%' },
+  held: { backgroundColor: arcadeColors.surfaceHeld },
+  filled: { backgroundColor: arcadeColors.signal, borderColor: arcadeColors.signal },
+  successBox: { backgroundColor: arcadeColors.success, borderColor: arcadeColors.success },
+  failureBox: { backgroundColor: arcadeColors.failure, borderColor: arcadeColors.failure },
+  drawBox: { borderColor: arcadeColors.victory },
+  playerLabel: { ...arcadeTypography.eyebrow, fontSize: 16 },
+  p1: { color: arcadeColors.player1 },
+  p2: { color: arcadeColors.player2 },
+  livesText: { ...arcadeTypography.body, position: 'absolute', top: 12, left: 14, fontWeight: '800' },
+  boxAction: { ...arcadeTypography.heading, marginTop: arcadeMetrics.spacing.sm },
+  boxActionSignal: { color: arcadeColors.signalText },
+  reactionText: { ...arcadeTypography.heading, color: arcadeColors.success, marginTop: 8, fontVariant: ['tabular-nums'] },
+  centerStatus: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  status: { ...arcadeTypography.heading, position: 'absolute', top: '50%', textAlign: 'center' },
+  statusTop: { ...arcadeTypography.heading, position: 'absolute', bottom: '50%', textAlign: 'center', transform: [{ rotate: '180deg' }] },
+  detail: { ...arcadeTypography.eyebrow, position: 'absolute', top: '54%', color: arcadeColors.failure },
+  detailTop: { ...arcadeTypography.eyebrow, position: 'absolute', bottom: '54%', color: arcadeColors.failure, transform: [{ rotate: '180deg' }] },
+  resultStatus: { color: arcadeColors.victory },
 });

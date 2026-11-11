@@ -35,6 +35,7 @@ export default function TwoVsTwoGameScreen() {
   });
   const [lives, setLives] = useState({ p1: 3, p2: 3 });
   const [roundWinner, setRoundWinner] = useState('');
+  const [roundDetail, setRoundDetail] = useState('');
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState({ p1: false, p2: false });
 
@@ -92,6 +93,7 @@ export default function TwoVsTwoGameScreen() {
     setReactionTimes({ p1: null, p2: null });
     setLives({ p1: 3, p2: 3 });
     setRoundWinner('');
+    setRoundDetail('');
     setBestReactionTime(null);
   };
 
@@ -139,6 +141,7 @@ export default function TwoVsTwoGameScreen() {
     setTargets({ p1: null, p2: null });
     setReactionTimes({ p1: null, p2: null });
     setRoundWinner('');
+    setRoundDetail('');
     updateGameState('waiting');
 
     timersRef.current.schedule(roundId, () => {
@@ -168,10 +171,13 @@ export default function TwoVsTwoGameScreen() {
             const p2Valid = reactionTimesRef.current.p2 !== null;
 
             if (!p1Valid && !p2Valid) {
+              setRoundDetail('TIMEOUT');
               resolveRound(roundId, 'both', 'Both slow - draw');
             } else if (!p1Valid) {
+              setRoundDetail('PLAYER 1 TOO SLOW');
               resolveRound(roundId, 'p1', 'Player 2');
             } else if (!p2Valid) {
+              setRoundDetail('PLAYER 2 TOO SLOW');
               resolveRound(roundId, 'p2', 'Player 1');
             }
           });
@@ -208,6 +214,7 @@ export default function TwoVsTwoGameScreen() {
     }
 
     if (stateAtRelease === 'waiting') {
+      setRoundDetail(cancelled ? 'HOLD INTERRUPTED' : 'FALSE START');
       const roundId = timersRef.current.beginRound();
       roundResolvedRef.current = false;
       resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
@@ -217,6 +224,7 @@ export default function TwoVsTwoGameScreen() {
     if (stateAtRelease !== 'zap' || startTimeRef.current === null) return;
     const target = targetsRef.current[player];
     if (target === null || !isCorrectTarget(target, index)) {
+      setRoundDetail('WRONG FINGER');
       const roundId = timersRef.current.beginRound();
       roundResolvedRef.current = false;
       resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
@@ -231,6 +239,7 @@ export default function TwoVsTwoGameScreen() {
       REACTION_DEADLINE_MS
     );
     if (evaluation.kind !== 'valid') {
+      setRoundDetail('TOO SLOW');
       roundResolvedRef.current = false;
       resolveRound(roundId, player, player === 'p1' ? 'Player 2' : 'Player 1');
       return;
@@ -262,10 +271,13 @@ export default function TwoVsTwoGameScreen() {
     roundResolvedRef.current = false;
 
     if (comparison === 'draw') {
+      setRoundDetail('TIED REACTION');
       resolveRound(roundId, 'none', 'Draw');
     } else if (comparison === 'first') {
+      setRoundDetail('FASTER REACTION');
       resolveRound(roundId, other, player === 'p1' ? 'Player 1' : 'Player 2');
     } else {
+      setRoundDetail('FASTER REACTION');
       resolveRound(roundId, player, other === 'p1' ? 'Player 1' : 'Player 2');
     }
   };
@@ -278,6 +290,7 @@ export default function TwoVsTwoGameScreen() {
         onBoxPressIn={onBoxPressIn}
         onBoxPressOut={onBoxPressOut}
         roundWinner={roundWinner}
+        roundDetail={roundDetail}
         gameState={gameState}
         reactionTimes={reactionTimes}
         bestReactionTime={bestReactionTime}

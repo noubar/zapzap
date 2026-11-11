@@ -1,42 +1,51 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import type { Router } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
-import DifficultySelector from './DifficultySelector';
 
-interface OneFingerSinglePlayerContent {
-    isFilled: boolean;
-    handlePressIn: () => void;
-    handlePressOut: (releaseTime: number, cancelled: boolean) => void;
-    gameState: string;
-    reactionTime: number;
-    bestReactionTime: number | null;
-    resetGame: () => void;
-    router: any;
-    zapesAvoided: number;
-    hasTouchedToStart: boolean;
-    difficulty: 'easy' | 'medium' | 'hard';
-    setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
-    levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
+import {
+  arcadeColors,
+  arcadeMetrics,
+  arcadeTypography,
+  formatReactionTime,
+} from '../constants/ArcadeTheme';
+import DifficultySelector from './DifficultySelector';
+import GameResultScreen from './GameResultScreen';
+
+interface OneFingerSinglePlayerContentProps {
+  isFilled: boolean;
+  handlePressIn: () => void;
+  handlePressOut: (releaseTime: number, cancelled: boolean) => void;
+  gameState: string;
+  reactionTime: number;
+  bestReactionTime: number | null;
+  resetGame: () => void;
+  router: Router;
+  zapesAvoided: number;
+  hasTouchedToStart: boolean;
+  difficulty: 'easy' | 'medium' | 'hard';
+  setDifficulty: (level: 'easy' | 'medium' | 'hard') => void;
+  levels: { label: string; value: 'easy' | 'medium' | 'hard' }[];
+  failureReason: string;
 }
 
-export default function SinglePlayerGameContent(props: OneFingerSinglePlayerContent) {
-  const {
-    isFilled,
-    handlePressIn,
-    handlePressOut,
-    gameState,
-    reactionTime,
-    bestReactionTime,
-    resetGame,
-    router,
-    zapesAvoided,
-    hasTouchedToStart,
-    difficulty,
-    setDifficulty,
-    levels: difficultyLevels,
-  } = props;
-
+export default function SinglePlayerGameContent({
+  isFilled,
+  handlePressIn,
+  handlePressOut,
+  gameState,
+  reactionTime,
+  bestReactionTime,
+  resetGame,
+  router,
+  zapesAvoided,
+  hasTouchedToStart,
+  difficulty,
+  setDifficulty,
+  levels,
+  failureReason,
+}: OneFingerSinglePlayerContentProps) {
   const holdGesture = Gesture.LongPress()
     .minDuration(0)
     .shouldCancelWhenOutside(false)
@@ -47,49 +56,95 @@ export default function SinglePlayerGameContent(props: OneFingerSinglePlayerCont
 
   if (gameState === 'game-over') {
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultText}>Game Over!</Text>
-        <Text style={styles.resultText}>Zaps Avoided: {zapesAvoided}</Text>
-        <Text style={styles.resultText}>Best Reaction: {bestReactionTime}</Text>
-        <Pressable style={styles.button} onPress={resetGame}>
-          <Text style={styles.buttonText}>Play Again</Text>
-        </Pressable>
-        <Pressable style={styles.button} onPress={() => router.push('/') }>
-          <Text style={styles.buttonText}>Main Menu</Text>
-        </Pressable>
-      </View>
+      <GameResultScreen
+        title="RUN OVER"
+        message={failureReason}
+        tone="failure"
+        stats={[
+          { label: 'Zaps avoided', value: String(zapesAvoided), accent: 'success' },
+          { label: 'Best reaction', value: formatReactionTime(bestReactionTime) },
+        ]}
+        onPlayAgain={resetGame}
+        onMainMenu={() => router.push('/')}
+      />
     );
   }
 
+  const isSuccess = gameState === 'reaction-done';
+  const isHeld = hasTouchedToStart && !isFilled && !isSuccess;
+  const status =
+    gameState === 'zap'
+      ? 'GO!'
+      : isSuccess
+        ? 'SUCCESS'
+        : hasTouchedToStart
+          ? 'KEEP HOLDING'
+          : 'TOUCH & HOLD';
+  const boxLabel = isFilled ? 'GO!' : isSuccess ? 'NICE!' : isHeld ? 'HOLD' : 'READY';
+
   return (
     <GestureHandlerRootView style={styles.screen}>
-    <Text style={styles.statusText}>{hasTouchedToStart ? 'WAITING' : 'TOUCH TO START'}</Text>
-    <DifficultySelector
-        difficulty={difficulty}
-        setDifficulty={setDifficulty}
-        hasTouchedToStart={hasTouchedToStart}
-        levels={difficultyLevels}
-        />
-      <GestureDetector gesture={holdGesture}>
-        <View style={[styles.rectangle, isFilled && styles.filled]}>
-          <View style={styles.fullSize} />
+      <SafeAreaView style={styles.playArea} edges={['top', 'bottom']}>
+        <View style={styles.hud}>
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[
+              styles.statusText,
+              isSuccess && styles.successText,
+              gameState === 'zap' && styles.goStatusText,
+            ]}
+          >
+            {status}
+          </Text>
+          <DifficultySelector
+            difficulty={difficulty}
+            setDifficulty={setDifficulty}
+            hasTouchedToStart={hasTouchedToStart}
+            levels={levels}
+          />
+          <View style={styles.statsRow}>
+            <View>
+              <Text style={styles.statLabel}>ZAPS</Text>
+              <Text style={styles.statValue}>{zapesAvoided}</Text>
+            </View>
+            <View style={styles.statRight}>
+              <Text style={styles.statLabel}>BEST</Text>
+              <Text style={styles.statValue}>{formatReactionTime(bestReactionTime)}</Text>
+            </View>
+          </View>
         </View>
-      </GestureDetector>
-      {reactionTime > 0 && (
-        <View style={styles.overlay}>
-          <Text style={styles.overlayText}>{reactionTime.toFixed(2)} ms</Text>
-        </View>
-      )}
-      <View style={{ position: 'absolute', top: 85, left: 0, right: 0, alignItems: 'center', zIndex: 20 }}>
-            <Text style={{ color: 'white', fontSize: 22, fontWeight: 'bold' }}>
-              Zaps Avoided: {zapesAvoided}
+
+        <GestureDetector gesture={holdGesture}>
+          <View
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Reaction button"
+            accessibilityHint="Touch and hold. Release only when the button turns white and says GO."
+            style={[
+              styles.rectangle,
+              isHeld && styles.held,
+              isSuccess && styles.successBox,
+              isFilled && styles.filled,
+            ]}
+          >
+            <Text
+              style={[
+                styles.boxLabel,
+                (isFilled || isSuccess) && styles.boxLabelFilled,
+              ]}
+            >
+              {boxLabel}
             </Text>
-      </View>
-      <View style={{ position: 'absolute', top: 110, left: 0, right: 0, alignItems: 'center', zIndex: 10 }}>
-        <Text style={{ color: 'white', fontSize: 18 }}>
-          Best Reaction: {bestReactionTime !== null ? bestReactionTime.toFixed(2) + ' ms' : '---'}
-        </Text>
-      </View>
+          </View>
+        </GestureDetector>
+
+        {isSuccess && reactionTime > 0 && (
+          <View pointerEvents="none" style={styles.reactionOverlay}>
+            <Text style={styles.reactionLabel}>REACTION</Text>
+            <Text style={styles.reactionTime}>{formatReactionTime(reactionTime)}</Text>
+          </View>
+        )}
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
@@ -98,70 +153,98 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: arcadeColors.background,
   },
-  rectangle: {
-    width: '90%',
-    height: '40%',
-    position: 'absolute',
-    borderWidth: 5,
-    borderColor: 'white',
-    bottom: '5%',
-  },
-  filled: {
-    backgroundColor: 'white',
-  },
-  fullSize: {
+  playArea: {
     flex: 1,
-  },
-  resultContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: 'black',
     width: '100%',
-    height: '100%',
-  },
-  resultText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  button: {
-    marginTop: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    backgroundColor: 'white',
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: 'black',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
     alignItems: 'center',
-    top: '-30%',
   },
-  overlayText: {
-    color: 'white',
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  statusText: {
+  hud: {
     position: 'absolute',
-    top: 50,
+    top: arcadeMetrics.spacing.md,
     left: 0,
     right: 0,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 28,
-    fontWeight: 'bold',
     zIndex: 10,
+    alignItems: 'center',
+    gap: arcadeMetrics.spacing.sm,
+  },
+  statusText: {
+    ...arcadeTypography.heading,
+    fontSize: 24,
+    textAlign: 'center',
+  },
+  goStatusText: {
+    color: arcadeColors.text,
+  },
+  successText: {
+    color: arcadeColors.success,
+  },
+  statsRow: {
+    width: '90%',
+    maxWidth: 520,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: arcadeMetrics.spacing.xs,
+  },
+  statRight: {
+    alignItems: 'flex-end',
+  },
+  statLabel: {
+    ...arcadeTypography.eyebrow,
+  },
+  statValue: {
+    ...arcadeTypography.body,
+    marginTop: 2,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  rectangle: {
+    position: 'absolute',
+    bottom: '5%',
+    width: '90%',
+    height: '40%',
+    maxWidth: 720,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: arcadeMetrics.borderWidth,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radius,
+    backgroundColor: arcadeColors.surface,
+  },
+  held: {
+    backgroundColor: arcadeColors.surfaceHeld,
+  },
+  filled: {
+    backgroundColor: arcadeColors.signal,
+    borderColor: arcadeColors.signal,
+  },
+  successBox: {
+    backgroundColor: arcadeColors.success,
+    borderColor: arcadeColors.success,
+  },
+  boxLabel: {
+    ...arcadeTypography.heading,
+    color: arcadeColors.textMuted,
+    letterSpacing: 2,
+  },
+  boxLabelFilled: {
+    color: arcadeColors.signalText,
+  },
+  reactionOverlay: {
+    position: 'absolute',
+    top: '43%',
+    alignItems: 'center',
+  },
+  reactionLabel: {
+    ...arcadeTypography.eyebrow,
+    color: arcadeColors.success,
+  },
+  reactionTime: {
+    ...arcadeTypography.title,
+    marginTop: arcadeMetrics.spacing.xs,
+    color: arcadeColors.success,
+    fontSize: 42,
+    fontVariant: ['tabular-nums'],
   },
 });

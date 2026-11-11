@@ -26,6 +26,7 @@ export default function SinglePlayerGameScreen() {
   const [bestReactionTime, setBestReactionTime] = useState<number | null>(null);
   const [hasTouchedToStart, setHasTouchedToStart] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy');
+  const [failureReason, setFailureReason] = useState('Round ended.');
 
   const timersRef = useRef(new RoundTimerManager());
   const startTimeRef = useRef<number | null>(null);
@@ -52,6 +53,7 @@ export default function SinglePlayerGameScreen() {
     setHasTouchedToStart(false);
     setZapesAvoided(0);
     setBestReactionTime(null);
+    setFailureReason('Round ended.');
   };
 
   const finishRound = (roundId: number) => {
@@ -89,6 +91,7 @@ export default function SinglePlayerGameScreen() {
             if (gameStateRef.current !== 'zap') return;
             touchHeldRef.current = false;
             setHasTouchedToStart(false);
+            setFailureReason('Timeout — the button was held past the deadline.');
             updateGameState('game-over');
             setIsFilled(false);
           });
@@ -111,6 +114,9 @@ export default function SinglePlayerGameScreen() {
 
     if (stateAtRelease === 'waiting') {
       timersRef.current.invalidate();
+      setFailureReason(
+        cancelled ? 'Hold interrupted before GO.' : 'False start — released before GO.'
+      );
       updateGameState('game-over');
       setIsFilled(false);
       return;
@@ -123,6 +129,7 @@ export default function SinglePlayerGameScreen() {
 
     if (result.kind !== 'valid') {
       timersRef.current.invalidate();
+      setFailureReason('Too slow — released after the deadline.');
       updateGameState('game-over');
       setIsFilled(false);
       return;
@@ -153,6 +160,7 @@ export default function SinglePlayerGameScreen() {
         difficulty={difficulty}
         setDifficulty={setDifficulty}
         levels={difficultyLevels}
+        failureReason={failureReason}
       />
     </View>
   );
