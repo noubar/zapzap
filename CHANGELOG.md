@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- A centralized `expo-audio` feedback service, its SDK-compatible `expo-asset` peer, and nine original, locally generated arcade sound effects for GO, success, false starts, timeouts, wrong-finger releases, round wins, match wins, draws, and menu actions.
+- A centralized `expo-audio` feedback service, its SDK-compatible `expo-asset` peer, eight original synthesized cues, and an owner-supplied electrical GO sound for success, failure, round, match, and menu feedback.
 - Shared sound and haptic feedback policies, session guards, duplicate-event protection, background audio deactivation, and failure-isolated playback cleanup.
 - Short result animations for successful reactions, failures, round outcomes, victories, and draws, with automatic reduced-motion support.
 - Deterministic feedback tests covering sound and haptic preferences, event mappings, Fake Signals fairness, multiplayer deduplication, stale-session cancellation, audio failures, cleanup, reduced motion, and preference persistence.
@@ -27,6 +27,7 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- The valid-GO sound now uses the project owner's supplied electrical-zap recording, trimmed and time-compressed from roughly 780 ms to 124 ms with a short fade for responsive repeated play.
 - Sound Effects and Visual Effects are now active persistent Game Options instead of unavailable placeholders; resetting options restores both to their enabled defaults.
 - GO presentation remains the authoritative timing event: feedback is dispatched only after the existing frame timestamp is established and is never awaited by reaction measurement.
 - Haptic feedback now includes lightweight success, error, round, match, and menu mappings, including Android system haptic constants where available.

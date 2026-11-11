@@ -5,8 +5,9 @@ const path = require('node:path');
 const SAMPLE_RATE = 22_050;
 const OUTPUT_DIR = path.join(__dirname, '..', 'assets', 'sounds');
 
+// go.wav is derived from the project owner's electric-zap source recording and
+// intentionally excluded so regenerating synthesized cues preserves it.
 const sounds = {
-  go: { duration: 0.07, notes: [[1_250, 0, 0.07]], wave: 'square', volume: 0.22 },
   success: { duration: 0.16, notes: [[740, 0, 0.08], [1_110, 0.08, 0.08]], wave: 'sine', volume: 0.25 },
   error: { duration: 0.19, notes: [[185, 0, 0.19]], wave: 'square', volume: 0.18 },
   timeout: { duration: 0.25, notes: [[440, 0, 0.11], [280, 0.11, 0.14]], wave: 'triangle', volume: 0.23 },
