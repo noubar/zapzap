@@ -35,7 +35,9 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
-- The Expo application version is now `2.2.0`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- Restored a filled heart icon after every in-game lives value in both multiplayer control modes.
+- The Expo application version is now `2.2.1`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- The main menu now distributes its sections across the available screen height while retaining scrolling on smaller displays.
 - The main menu now links to Statistics and Achievements without adding detailed progress data to the gameplay selection interface.
 - All four authoritative round settlement paths publish statistics only after gameplay has captured and validated outcomes; persistence is initiated only after competitive waiting and GO states have ended.
 - Interrupted or abandoned single-player rounds do not invent a success or failure and leave the previously persisted streak unchanged.
@@ -66,6 +68,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Web screenshot automation now uses one consistent viewport and pixel density for every page, uses the current accessible control-mode label, captures each route in isolation, continues attempting later routes after an individual failure, and includes the Game Options screen.
 - Duplicate releases, competing timeout callbacks, rerenders, and repeated match settlement cannot record the same statistics event or achievement twice.
 - Reset Statistics clears records and achievements without changing difficulty, match format, Fake Signals, sound, haptic, or visual preferences.
 - Audio preparation, seeking, playback, haptic failures, stale callbacks, and cleanup errors cannot interrupt gameplay or mutate round results.

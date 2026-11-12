@@ -171,13 +171,14 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: arcadeMetrics.spacing.md,
     paddingVertical: arcadeMetrics.spacing.md,
   },
   content: {
+    flexGrow: 1,
     width: '100%',
     maxWidth: arcadeMetrics.maxContentWidth,
+    justifyContent: 'space-between',
   },
   utilityRow: {
     minHeight: 44,

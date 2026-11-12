@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { Router } from 'expo-router';
+import { Heart } from 'lucide-react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -90,6 +91,7 @@ export default function OneFingerTwoPlayerContent({
     const draw = gameState === 'round-result' && (roundWinner === 'Draw' || roundWinner.includes('draw'));
     const result = roundResults[player];
     const winsRequired = getWinsRequired(matchFormat);
+    const playerColor = player === 'p1' ? arcadeColors.player1 : arcadeColors.player2;
     const scoreText = matchFormat === 'three-lives'
       ? `LIVES ${lives[player]}`
       : matchFormat === 'single-round'
@@ -115,9 +117,14 @@ export default function OneFingerTwoPlayerContent({
           <Text style={[styles.playerLabel, player === 'p1' ? styles.p1 : styles.p2]}>
             PLAYER {playerNumber}
           </Text>
-          <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>
-            {scoreText}
-          </Text>
+          <View style={styles.scoreRow}>
+            <Text style={[styles.livesText, player === 'p1' ? styles.p1 : styles.p2]}>
+              {scoreText}
+            </Text>
+            {matchFormat === 'three-lives' ? (
+              <Heart size={18} color={playerColor} fill={playerColor} />
+            ) : null}
+          </View>
           <Text style={[
             styles.boxAction,
             (isFilled || fakeSignal?.colorName === 'amber') && styles.boxActionSignal,
@@ -177,7 +184,11 @@ const styles = StyleSheet.create({
   playerLabel: { ...arcadeTypography.eyebrow, fontSize: 16 },
   p1: { color: arcadeColors.player1 },
   p2: { color: arcadeColors.player2 },
-  livesText: { ...arcadeTypography.body, position: 'absolute', top: 12, left: 14, fontWeight: '800' },
+  scoreRow: {
+    position: 'absolute', top: 12, left: 14, flexDirection: 'row', alignItems: 'center',
+    gap: arcadeMetrics.spacing.xs,
+  },
+  livesText: { ...arcadeTypography.body, fontWeight: '800' },
   boxAction: { ...arcadeTypography.heading, marginTop: arcadeMetrics.spacing.sm },
   boxActionSignal: { color: arcadeColors.signalText },
   reactionText: { ...arcadeTypography.heading, color: arcadeColors.success, marginTop: 8, fontVariant: ['tabular-nums'] },
