@@ -30,6 +30,7 @@ import {
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useFeedback } from '../feedback/FeedbackProvider';
 import type { FeedbackEvent } from '../feedback/feedbackPolicy';
+import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -47,6 +48,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
   const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
+  const { recordEvent, setGameplayActive } = useStatistics();
   const initialMatch = createInitialMultiplayerState();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [targets, setTargets] = useState<{ p1: BoxIndex | null; p2: BoxIndex | null }>({ p1: null, p2: null });
@@ -75,6 +77,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const gameStateRef = useRef<GameState>('idle');
   const roundResolvedRef = useRef(false);
   const roundFakeSignalsEnabledRef = useRef(false);
+  const roundDifficultyRef = useRef(settings.difficulty);
   const feedbackSessionRef = useRef(0);
   const outcomeFeedbackRef = useRef<FeedbackEvent>('round-won');
   const matchScoreRef = useRef<MultiplayerMatchScore>({
@@ -82,11 +85,15 @@ export default function TwoFingerTwoPlayerGameScreen() {
     roundWins: initialMatch.roundWins,
     roundsPlayed: initialMatch.roundsPlayed,
   });
+  const statisticsSessionRef = useRef(createStatisticsSessionId('two-finger-duel'));
+  const roundSequenceRef = useRef(0);
+  const currentRoundEventIdRef = useRef('');
 
   useEffect(() => () => {
     timersRef.current.invalidate();
     cancelFeedback();
-  }, [cancelFeedback]);
+    setGameplayActive(false);
+  }, [cancelFeedback, setGameplayActive]);
 
   useEffect(() => {
     const winner = getConfiguredMatchWinner(matchScore, matchFormatRef.current);
@@ -95,12 +102,15 @@ export default function TwoFingerTwoPlayerGameScreen() {
     activeRoundIdRef.current = null;
     setRoundWinner(winner === 'draw' ? 'Draw' : playerLabel(winner));
     setRoundDetail('MATCH COMPLETE');
-    updateGameState('game-over');
-  }, [matchScore]);
+    gameStateRef.current = 'game-over';
+    setGameState('game-over');
+    setGameplayActive(false);
+  }, [matchScore, setGameplayActive]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
     setGameState(nextState);
+    setGameplayActive(nextState === 'waiting' || nextState === 'zap');
   };
 
   const resetReadiness = () => {
@@ -124,6 +134,8 @@ export default function TwoFingerTwoPlayerGameScreen() {
     activeRoundIdRef.current = null;
     signalTimeRef.current = null;
     roundResolvedRef.current = false;
+    statisticsSessionRef.current = createStatisticsSessionId('two-finger-duel');
+    roundSequenceRef.current = 0;
     resetReadiness();
     replaceTargets({ p1: null, p2: null });
     replaceRoundResults(nextMatch.results);
@@ -185,6 +197,34 @@ export default function TwoFingerTwoPlayerGameScreen() {
       'both-failed': 'BOTH PLAYERS FAILED',
     }[outcome.reason]);
     finishRound(roundId);
+    const occurredAt = new Date().toISOString();
+    recordEvent({
+      id: currentRoundEventIdRef.current,
+      type: 'multiplayer-round-completed',
+      occurredAt,
+      configuration: {
+        variant: 'two-finger-multiplayer',
+        difficulty: roundDifficultyRef.current,
+        fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+        matchFormat: matchFormatRef.current,
+      },
+      results: roundResultsRef.current,
+      outcome,
+    });
+    if (matchWinner !== null) {
+      recordEvent({
+        id: `${statisticsSessionRef.current}:match`,
+        type: 'multiplayer-match-completed',
+        occurredAt,
+        configuration: {
+          variant: 'two-finger-multiplayer',
+          difficulty: roundDifficultyRef.current,
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+          matchFormat: matchFormatRef.current,
+        },
+        winner: matchWinner,
+      });
+    }
   };
 
   const recordValidReaction = (player: Player, reactionTime: number) => {
@@ -225,10 +265,13 @@ export default function TwoFingerTwoPlayerGameScreen() {
 
   const beginWaitingForZap = () => {
     const roundId = timersRef.current.beginRound();
+    roundSequenceRef.current += 1;
+    currentRoundEventIdRef.current = `${statisticsSessionRef.current}:round:${roundSequenceRef.current}`;
     feedbackSessionRef.current = beginFeedbackSession();
     outcomeFeedbackRef.current = 'round-won';
     activeRoundIdRef.current = roundId;
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundDifficultyRef.current = settings.difficulty;
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     roundResolvedRef.current = false;
     signalTimeRef.current = null;

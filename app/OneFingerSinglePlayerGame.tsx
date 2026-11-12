@@ -12,6 +12,7 @@ import {
 } from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useFeedback } from '../feedback/FeedbackProvider';
+import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -26,6 +27,7 @@ export default function SinglePlayerGameScreen() {
   const router = useRouter();
   const { settings, setSetting } = useGlobalSettings();
   const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
+  const { recordEvent, setGameplayActive } = useStatistics();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isFilled, setIsFilled] = useState(false);
   const [reactionTime, setReactionTime] = useState(0);
@@ -40,22 +42,49 @@ export default function SinglePlayerGameScreen() {
   const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const touchHeldRef = useRef(false);
   const roundFakeSignalsEnabledRef = useRef(false);
+  const roundDifficultyRef = useRef(settings.difficulty);
   const gameStateRef = useRef<GameState>('idle');
   const feedbackSessionRef = useRef(0);
+  const statisticsSessionRef = useRef(createStatisticsSessionId('one-finger-solo'));
+  const gameStartedRecordedRef = useRef(false);
+  const roundSequenceRef = useRef(0);
+  const currentRoundEventIdRef = useRef('');
 
   useEffect(() => () => {
     timersRef.current.invalidate();
     cancelFeedback();
-  }, [cancelFeedback]);
+    setGameplayActive(false);
+  }, [cancelFeedback, setGameplayActive]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
     setGameState(nextState);
+    setGameplayActive(nextState === 'waiting' || nextState === 'zap');
   };
+
+  const recordRound = (
+    eventId: string,
+    result: { kind: 'valid'; reactionTimeMs: number } | { kind: 'invalid'; reason: 'false-start' | 'timeout' | 'cancelled' | 'late' },
+    gameCompleted: boolean
+  ) => recordEvent({
+    id: eventId,
+    type: 'single-round-completed',
+    occurredAt: new Date().toISOString(),
+    configuration: {
+      variant: 'one-finger-single',
+      difficulty: roundDifficultyRef.current,
+      fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+    },
+    result,
+    gameCompleted,
+  });
 
   const resetGame = () => {
     timersRef.current.invalidate();
     cancelFeedback();
+    statisticsSessionRef.current = createStatisticsSessionId('one-finger-solo');
+    gameStartedRecordedRef.current = false;
+    roundSequenceRef.current = 0;
     startTimeRef.current = null;
     touchHeldRef.current = false;
     updateGameState('idle');
@@ -82,10 +111,26 @@ export default function SinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    roundSequenceRef.current += 1;
+    currentRoundEventIdRef.current = `${statisticsSessionRef.current}:round:${roundSequenceRef.current}`;
     feedbackSessionRef.current = beginFeedbackSession();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundDifficultyRef.current = settings.difficulty;
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     updateGameState('waiting');
+    if (!gameStartedRecordedRef.current) {
+      gameStartedRecordedRef.current = true;
+      recordEvent({
+        id: `${statisticsSessionRef.current}:game-started`,
+        type: 'single-game-started',
+        occurredAt: new Date().toISOString(),
+        configuration: {
+          variant: 'one-finger-single',
+          difficulty: roundDifficultyRef.current,
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+        },
+      });
+    }
     setIsFilled(false);
     setReactionTime(0);
     startTimeRef.current = null;
@@ -128,6 +173,7 @@ export default function SinglePlayerGameScreen() {
             setIsFilled(false);
             setFakeSignal(null);
             emitFeedback('timeout', { eventId: `${roundId}:timeout`, session: feedbackSessionRef.current });
+            recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: 'timeout' }, true);
           });
         }, roundDeadlineRef.current);
       });
@@ -155,6 +201,7 @@ export default function SinglePlayerGameScreen() {
       setIsFilled(false);
       setFakeSignal(null);
       emitFeedback('false-start', { eventId: `${feedbackSessionRef.current}:false-start`, session: feedbackSessionRef.current });
+      recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: cancelled ? 'cancelled' : 'false-start' }, true);
       return;
     }
 
@@ -170,6 +217,7 @@ export default function SinglePlayerGameScreen() {
       setIsFilled(false);
       setFakeSignal(null);
       emitFeedback('timeout', { eventId: `${feedbackSessionRef.current}:late`, session: feedbackSessionRef.current });
+      recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: 'late' }, true);
       return;
     }
 
@@ -180,6 +228,7 @@ export default function SinglePlayerGameScreen() {
       previous === null ? result.reactionTime : Math.min(previous, result.reactionTime)
     );
     emitFeedback('success', { eventId: `${feedbackSessionRef.current}:success`, session: feedbackSessionRef.current });
+    recordRound(currentRoundEventIdRef.current, { kind: 'valid', reactionTimeMs: result.reactionTime }, false);
     finishRound(transitionId);
   };
 

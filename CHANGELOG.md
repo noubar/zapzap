@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- A centralized, presentation-independent statistics engine with normalized, session-scoped gameplay events and persisted exactly-once event identifiers.
+- Versioned local statistics persistence with validation, corrupted-data recovery, migration, serialized writes, and reset ordering that prevents stale writes from restoring cleared data.
+- Separate reaction records for all four variants, four difficulties, and Fake Signals states, retaining full measurement precision for fastest and incremental-average calculations.
+- Single-player games, zaps avoided, current and longest streaks, failure classifications, and completed-run tracking for both control variants.
+- Per-position multiplayer match and round wins, losses, draws, reaction aggregates, and failure counts for both duel variants and every match format.
+- Fourteen data-driven offline achievements with stable identifiers, timestamps, measurable progress, and notifications deferred whenever a competitive reaction state is active.
+- A safe-area-aware Statistics route with overview metrics, configuration filters, multiplayer summaries, achievement gallery, accessible empty values, and an independently confirmed Reset Statistics action.
+- Deterministic statistics and persistence tests covering precision, records, streaks, failures, configuration separation, match formats, achievements, deduplication, migrations, rapid writes, and reset safety.
 - A centralized `expo-audio` feedback service, its SDK-compatible `expo-asset` peer, eight original synthesized cues, and an owner-supplied electrical GO sound for success, failure, round, match, and menu feedback.
 - Shared sound and haptic feedback policies, session guards, duplicate-event protection, background audio deactivation, and failure-isolated playback cleanup.
 - Short result animations for successful reactions, failures, round outcomes, victories, and draws, with automatic reduced-motion support.
@@ -27,6 +35,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- The Expo application version is now `2.2.0`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- The main menu now links to Statistics and Achievements without adding detailed progress data to the gameplay selection interface.
+- All four authoritative round settlement paths publish statistics only after gameplay has captured and validated outcomes; persistence is initiated only after competitive waiting and GO states have ended.
+- Interrupted or abandoned single-player rounds do not invent a success or failure and leave the previously persisted streak unchanged.
 - The valid-GO sound now uses the project owner's supplied electrical-zap recording, trimmed and time-compressed from roughly 780 ms to 124 ms with a short fade for responsive repeated play.
 - Sound Effects and Visual Effects are now active persistent Game Options instead of unavailable placeholders; resetting options restores both to their enabled defaults.
 - GO presentation remains the authoritative timing event: feedback is dispatched only after the existing frame timestamp is established and is never awaited by reaction measurement.
@@ -54,6 +66,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Duplicate releases, competing timeout callbacks, rerenders, and repeated match settlement cannot record the same statistics event or achievement twice.
+- Reset Statistics clears records and achievements without changing difficulty, match format, Fake Signals, sound, haptic, or visual preferences.
 - Audio preparation, seeking, playback, haptic failures, stale callbacks, and cleanup errors cannot interrupt gameplay or mutate round results.
 - Rapid replay, reset, navigation, and app backgrounding invalidate pending feedback and stop reusable players without allocating new players during rounds.
 - Fake flashes remain presentation-only waiting states: they never create a reaction timestamp, deadline, score, life penalty, or valid release path.
@@ -75,6 +89,8 @@ All notable changes to this project are documented in this file.
 
 ### Known Limitations
 
+- Statistics represent local device data and Player 1/Player 2 positions rather than authenticated people; uninstalling the app or clearing its storage removes progress.
+- Statistics and achievement layouts, screen-reader flow, and notification placement still require physical phone and tablet verification.
 - Actual speaker latency, silent-switch behavior, perceived volume, Android/iOS haptic character, and animation smoothness still require physical-device verification.
 - Fake-signal flash perception and cancellation during operating-system interruptions still require physical Android and iOS verification.
 - Four-finger gesture recognition and near-simultaneous native release delivery still require physical Android and iOS device testing.

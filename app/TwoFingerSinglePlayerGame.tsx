@@ -18,6 +18,7 @@ import {
 } from '../gameplay/fakeSignals';
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useFeedback } from '../feedback/FeedbackProvider';
+import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -34,6 +35,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const router = useRouter();
   const { settings, setSetting } = useGlobalSettings();
   const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
+  const { recordEvent, setGameplayActive } = useStatistics();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [filledFinger, setFilledFinger] = useState<Finger | null>(null);
   const [reactionTime, setReactionTime] = useState(0);
@@ -50,20 +52,48 @@ export default function TwoFingerSinglePlayerGameScreen() {
   const touchHeldRef = useRef({ left: false, right: false });
   const gameStateRef = useRef<GameState>('idle');
   const roundFakeSignalsEnabledRef = useRef(false);
+  const roundDifficultyRef = useRef(settings.difficulty);
   const feedbackSessionRef = useRef(0);
+  const statisticsSessionRef = useRef(createStatisticsSessionId('two-finger-solo'));
+  const gameStartedRecordedRef = useRef(false);
+  const roundSequenceRef = useRef(0);
+  const currentRoundEventIdRef = useRef('');
 
   useEffect(() => () => {
     timersRef.current.invalidate();
     cancelFeedback();
-  }, [cancelFeedback]);
+    setGameplayActive(false);
+  }, [cancelFeedback, setGameplayActive]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
     setGameState(nextState);
+    setGameplayActive(nextState === 'waiting' || nextState === 'zap');
   };
+
+  const recordRound = (
+    eventId: string,
+    result: { kind: 'valid'; reactionTimeMs: number } | { kind: 'invalid'; reason: 'false-start' | 'timeout' | 'wrong-finger' | 'cancelled' | 'late' },
+    gameCompleted: boolean
+  ) => recordEvent({
+    id: eventId,
+    type: 'single-round-completed',
+    occurredAt: new Date().toISOString(),
+    configuration: {
+      variant: 'two-finger-single',
+      difficulty: roundDifficultyRef.current,
+      fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+    },
+    result,
+    gameCompleted,
+  });
 
   const resetGame = () => {
     timersRef.current.invalidate();
+    cancelFeedback();
+    statisticsSessionRef.current = createStatisticsSessionId('two-finger-solo');
+    gameStartedRecordedRef.current = false;
+    roundSequenceRef.current = 0;
     cancelFeedback();
     updateGameState('idle');
     setFilledFinger(null);
@@ -80,13 +110,29 @@ export default function TwoFingerSinglePlayerGameScreen() {
 
   const startRound = () => {
     const roundId = timersRef.current.beginRound();
+    roundSequenceRef.current += 1;
+    currentRoundEventIdRef.current = `${statisticsSessionRef.current}:round:${roundSequenceRef.current}`;
     feedbackSessionRef.current = beginFeedbackSession();
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundDifficultyRef.current = settings.difficulty;
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     const target = Math.random() < 0.5 ? 'left' : 'right';
     targetFingerRef.current = target;
     startTimeRef.current = null;
     updateGameState('waiting');
+    if (!gameStartedRecordedRef.current) {
+      gameStartedRecordedRef.current = true;
+      recordEvent({
+        id: `${statisticsSessionRef.current}:game-started`,
+        type: 'single-game-started',
+        occurredAt: new Date().toISOString(),
+        configuration: {
+          variant: 'two-finger-single',
+          difficulty: roundDifficultyRef.current,
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+        },
+      });
+    }
     setFilledFinger(null);
     setReactionTime(0);
     setFakeSignal(null);
@@ -132,6 +178,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
             setHasTouchedToStart({ left: false, right: false });
             touchHeldRef.current = { left: false, right: false };
             emitFeedback('timeout', { eventId: `${roundId}:timeout`, session: feedbackSessionRef.current });
+            recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: 'timeout' }, true);
           });
         }, roundDeadlineRef.current);
       });
@@ -167,6 +214,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFilledFinger(null);
       setFakeSignal(null);
       emitFeedback('false-start', { eventId: `${feedbackSessionRef.current}:false-start`, session: feedbackSessionRef.current });
+      recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: cancelled ? 'cancelled' : 'false-start' }, true);
       return;
     }
 
@@ -180,6 +228,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFilledFinger(null);
       setFakeSignal(null);
       emitFeedback('wrong-finger', { eventId: `${feedbackSessionRef.current}:wrong`, session: feedbackSessionRef.current });
+      recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: 'wrong-finger' }, true);
       return;
     }
 
@@ -193,6 +242,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
       setFilledFinger(null);
       setFakeSignal(null);
       emitFeedback('timeout', { eventId: `${feedbackSessionRef.current}:late`, session: feedbackSessionRef.current });
+      recordRound(currentRoundEventIdRef.current, { kind: 'invalid', reason: 'late' }, true);
       return;
     }
 
@@ -204,6 +254,7 @@ export default function TwoFingerSinglePlayerGameScreen() {
     setFakeSignal(null);
     updateGameState('reaction-done');
     emitFeedback('success', { eventId: `${feedbackSessionRef.current}:success`, session: feedbackSessionRef.current });
+    recordRound(currentRoundEventIdRef.current, { kind: 'valid', reactionTimeMs: result.reactionTime }, false);
 
     const transitionId = timersRef.current.beginRound();
     timersRef.current.schedule(transitionId, () => {

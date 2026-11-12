@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
-import { SlidersHorizontal, User, Users } from 'lucide-react-native';
+import { BarChart3, SlidersHorizontal, User, Users } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,6 +65,15 @@ export default function MenuScreen() {
       >
         <View style={styles.content}>
           <View style={styles.utilityRow}>
+            <Pressable
+              style={({ pressed }) => [styles.optionsButton, pressed && styles.pressed]}
+              onPress={() => router.push('/statistics' as Href)}
+              accessibilityRole="button"
+              accessibilityLabel="Open statistics and achievements"
+            >
+              <BarChart3 size={18} color={arcadeColors.text} />
+              <Text style={styles.optionsLabel}>STATISTICS</Text>
+            </Pressable>
             <Pressable
               style={({ pressed }) => [styles.optionsButton, pressed && styles.pressed]}
               onPress={() => router.push('/options' as Href)}
@@ -172,8 +181,9 @@ const styles = StyleSheet.create({
   },
   utilityRow: {
     minHeight: 44,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   optionsButton: {
     minHeight: 44,

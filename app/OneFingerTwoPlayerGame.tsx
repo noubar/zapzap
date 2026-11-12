@@ -28,6 +28,7 @@ import {
 import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useFeedback } from '../feedback/FeedbackProvider';
 import type { FeedbackEvent } from '../feedback/feedbackPolicy';
+import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { getReactionDeadline } from '../settings/gameSettings';
 import { useGlobalSettings } from './GlobalSettings';
 
@@ -41,6 +42,7 @@ export default function OneFingerTwoPlayerGameScreen() {
   const router = useRouter();
   const { settings } = useGlobalSettings();
   const { beginFeedbackSession, cancelFeedback, emitFeedback } = useFeedback();
+  const { recordEvent, setGameplayActive } = useStatistics();
   const initialMatch = createInitialMultiplayerState();
   const [gameState, setGameState] = useState<GameState>('idle');
   const [isFilled, setIsFilled] = useState(false);
@@ -66,6 +68,7 @@ export default function OneFingerTwoPlayerGameScreen() {
   const gameStateRef = useRef<GameState>('idle');
   const roundResolvedRef = useRef(false);
   const roundFakeSignalsEnabledRef = useRef(false);
+  const roundDifficultyRef = useRef(settings.difficulty);
   const feedbackSessionRef = useRef(0);
   const outcomeFeedbackRef = useRef<FeedbackEvent>('round-won');
   const matchScoreRef = useRef<MultiplayerMatchScore>({
@@ -73,11 +76,15 @@ export default function OneFingerTwoPlayerGameScreen() {
     roundWins: initialMatch.roundWins,
     roundsPlayed: initialMatch.roundsPlayed,
   });
+  const statisticsSessionRef = useRef(createStatisticsSessionId('one-finger-duel'));
+  const roundSequenceRef = useRef(0);
+  const currentRoundEventIdRef = useRef('');
 
   useEffect(() => () => {
     timersRef.current.invalidate();
     cancelFeedback();
-  }, [cancelFeedback]);
+    setGameplayActive(false);
+  }, [cancelFeedback, setGameplayActive]);
 
   useEffect(() => {
     const winner = getConfiguredMatchWinner(matchScore, matchFormatRef.current);
@@ -86,12 +93,15 @@ export default function OneFingerTwoPlayerGameScreen() {
     activeRoundIdRef.current = null;
     setRoundWinner(winner === 'draw' ? 'Draw' : playerLabel(winner));
     setRoundDetail('MATCH COMPLETE');
-    updateGameState('game-over');
-  }, [matchScore]);
+    gameStateRef.current = 'game-over';
+    setGameState('game-over');
+    setGameplayActive(false);
+  }, [matchScore, setGameplayActive]);
 
   const updateGameState = (nextState: GameState) => {
     gameStateRef.current = nextState;
     setGameState(nextState);
+    setGameplayActive(nextState === 'waiting' || nextState === 'zap');
   };
 
   const resetReadiness = () => {
@@ -110,6 +120,8 @@ export default function OneFingerTwoPlayerGameScreen() {
     activeRoundIdRef.current = null;
     signalTimeRef.current = null;
     roundResolvedRef.current = false;
+    statisticsSessionRef.current = createStatisticsSessionId('one-finger-duel');
+    roundSequenceRef.current = 0;
     resetReadiness();
     replaceRoundResults(nextMatch.results);
     matchFormatRef.current = settings.matchFormat;
@@ -171,6 +183,34 @@ export default function OneFingerTwoPlayerGameScreen() {
       'both-failed': 'BOTH PLAYERS FAILED',
     }[outcome.reason]);
     finishRound(roundId);
+    const occurredAt = new Date().toISOString();
+    recordEvent({
+      id: currentRoundEventIdRef.current,
+      type: 'multiplayer-round-completed',
+      occurredAt,
+      configuration: {
+        variant: 'one-finger-multiplayer',
+        difficulty: roundDifficultyRef.current,
+        fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+        matchFormat: matchFormatRef.current,
+      },
+      results: roundResultsRef.current,
+      outcome,
+    });
+    if (matchWinner !== null) {
+      recordEvent({
+        id: `${statisticsSessionRef.current}:match`,
+        type: 'multiplayer-match-completed',
+        occurredAt,
+        configuration: {
+          variant: 'one-finger-multiplayer',
+          difficulty: roundDifficultyRef.current,
+          fakeSignalsEnabled: roundFakeSignalsEnabledRef.current,
+          matchFormat: matchFormatRef.current,
+        },
+        winner: matchWinner,
+      });
+    }
   };
 
   const recordValidReaction = (player: Player, reactionTime: number) => {
@@ -212,10 +252,13 @@ export default function OneFingerTwoPlayerGameScreen() {
 
   const beginWaitingForZap = () => {
     const roundId = timersRef.current.beginRound();
+    roundSequenceRef.current += 1;
+    currentRoundEventIdRef.current = `${statisticsSessionRef.current}:round:${roundSequenceRef.current}`;
     feedbackSessionRef.current = beginFeedbackSession();
     outcomeFeedbackRef.current = 'round-won';
     activeRoundIdRef.current = roundId;
     roundDeadlineRef.current = getReactionDeadline(settings.difficulty);
+    roundDifficultyRef.current = settings.difficulty;
     roundFakeSignalsEnabledRef.current = settings.fakeSignalsEnabled;
     roundResolvedRef.current = false;
     signalTimeRef.current = null;
