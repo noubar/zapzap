@@ -6,6 +6,19 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- A responsive annular radial arena for 2–8 one-finger players on eligible larger viewports, using equal dynamic sectors, a noninteractive neutral center, rotated local labels, and compact per-player results.
+- Pure radial geometry and hit-testing utilities for configurable dimensions, center radius, rotation, exact angular boundaries, center exclusion, and outside-circle rejection.
+- Arena-wide pointer-ID ownership that assigns contacts from their starting coordinates, preserves ownership across movement, rejects extra contacts in occupied sectors, and resolves releases exactly once.
+- A TEST MULTITOUCH calibration route that displays current and highest observed simultaneous pointer counts and persists the observed capacity without treating it as a hardware guarantee.
+- Fully playable five-, six-, seven-, and eight-player matches using the existing generalized engine, all five match formats, shared Fake Signals, elimination, replay, and centralized feedback.
+- Deterministic radial, pointer-ownership, calibration, capacity, and eight-player integration tests.
+- The Expo-compatible `react-native-svg` direct dependency for lightweight sector rendering.
+- A generalized, presentation-independent multiplayer engine using dynamic player arrays, readiness, results, ranking, lives, wins, elimination, match completion, and reset logic validated with 2, 3, 4, and 8-player data structures.
+- Fully playable one-finger three-player and four-player matches with one shared randomized GO signal, independent reactions, all five match formats, synchronized Fake Signals, and centralized feedback.
+- A reusable adaptive smartphone arena with three equal-area regions or four quadrants, simultaneous region gestures, stable touch ownership, cancellation handling, and per-player results.
+- An accessible 2–4 player slider in the one-finger Multiplayer menu, persistent selection, screen-dimension capacity limits, and dynamic Start Game labeling.
+- Generalized multiplayer regression tests covering initialization, readiness, state transitions, ranking, ties, invalid results, timeouts, penalties, elimination, formats, reset, and capacity validation.
+- Physical-device multiplayer testing notes documenting touch ownership, hardware-capability limits, and required Android checks.
 - A centralized, presentation-independent statistics engine with normalized, session-scoped gameplay events and persisted exactly-once event identifiers.
 - Versioned local statistics persistence with validation, corrupted-data recovery, migration, serialized writes, and reset ordering that prevents stale writes from restoring cleared data.
 - Separate reaction records for all four variants, four difficulties, and Fake Signals states, retaining full measurement precision for fastest and incremental-average calculations.
@@ -35,8 +48,14 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- The one-finger player slider now exposes 2–8 only within the intersection of usable radial geometry and observed multitouch capacity; unknown higher-touch capability safely remains capped at four with a visible calibration path.
+- Eligible tablet-sized multiplayer routes use the radial renderer while smartphone routes retain their original rectangular and top/bottom presentations.
+- The app permits orientation changes only for the radial multiplayer and calibration routes; existing smartphone gameplay remains portrait, and active rounds are cancelled safely when viewport geometry changes.
+- The main menu now groups gameplay under Single Player and Multiplayer for each finger mode; only one-finger Multiplayer exposes the player-count selector, while two-finger Multiplayer remains a two-player game.
+- Expanded one-finger rounds continue after an individual false start, exclude that player from the remaining round, and delay player-specific outcome feedback until safe settlement.
+- Three Lives now penalizes invalid expanded-mode participants first, otherwise penalizes the exactly slowest valid placement; eliminated players no longer participate in readiness checks.
 - Restored a filled heart icon after every in-game lives value in both multiplayer control modes.
-- The Expo application version is now `2.2.1`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- The Expo application version is now `2.2.2`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
 - The main menu now distributes its sections across the available screen height while retaining scrolling on smaller displays.
 - The main menu now links to Statistics and Achievements without adding detailed progress data to the gameplay selection interface.
 - All four authoritative round settlement paths publish statistics only after gameplay has captured and validated outcomes; persistence is initiated only after competitive waiting and GO states have ended.
@@ -89,6 +108,12 @@ All notable changes to this project are documented in this file.
 - Tutorial animation callbacks and animation work are fully cancelled when the screen unmounts.
 - Gesture cancellation and interruption clear held state and follow the active round's normal release rules.
 - Two-player reaction handling no longer mutates React state directly.
+
+### Known limitations
+
+- Five-to-eight-player gameplay is supported in software but requires calibration and physical tablet validation; screen dimensions and one observed test cannot prove a permanent hardware contact limit.
+- Orientation locks are platform preferences and can be constrained by iPad multitasking, resizable windows, or operating-system policy; the arena therefore remains responsive and cancels active rounds on size changes.
+- New 3–8-player matches intentionally do not add statistics or achievements in this implementation.
 
 ### Known Limitations
 

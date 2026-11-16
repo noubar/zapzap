@@ -2,8 +2,8 @@
   "expo": {
     "name": "zapzap",
     "slug": "zapzap",
-    "version": "2.2.1",
-    "orientation": "portrait",
+    "version": "2.2.2",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "zapzap",
     "userInterfaceStyle": "automatic",
@@ -44,7 +44,8 @@
       "expo-font",
       "expo-web-browser",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
