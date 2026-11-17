@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import type { Router } from 'expo-router';
+import type { ImperativeRouter } from 'expo-router';
 import { Heart } from 'lucide-react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,7 +32,7 @@ interface TwoFingerTwoPlayerContentProps {
   roundResults: MultiplayerRoundResults;
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: Router;
+  router: ImperativeRouter;
   hasTouchedToStart: { p1: boolean; p2: boolean };
   fakeSignal: {
     color: FakeSignalColor;
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   reactionText: { ...arcadeTypography.body, color: arcadeColors.success, fontWeight: '800', fontVariant: ['tabular-nums'] },
   failureText: { color: arcadeColors.failure },
   noReleaseText: { color: arcadeColors.textMuted, fontSize: 11 },
-  centerStatus: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  centerStatus: { ...StyleSheet.absoluteFill, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
   status: { ...arcadeTypography.heading, position: 'absolute', top: '50%', textAlign: 'center' },
   statusTop: { ...arcadeTypography.heading, position: 'absolute', bottom: '50%', textAlign: 'center', transform: [{ rotate: '180deg' }] },
   detail: { ...arcadeTypography.eyebrow, position: 'absolute', top: '54%', color: arcadeColors.failure },

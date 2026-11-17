@@ -14,7 +14,7 @@ import { RoundTimerManager } from '../gameplay/RoundTimerManager';
 import { useFeedback } from '../feedback/FeedbackProvider';
 import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { DIFFICULTIES, DIFFICULTY_PROFILES, getReactionDeadline } from '../settings/gameSettings';
-import { useGlobalSettings } from './GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 
 const difficultyLevels = DIFFICULTIES.map((value) => ({
   label: DIFFICULTY_PROFILES[value].label,

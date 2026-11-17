@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import type { Router } from 'expo-router';
+import type { ImperativeRouter } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -24,7 +24,7 @@ interface OneFingerSinglePlayerContentProps {
   reactionTime: number;
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: Router;
+  router: ImperativeRouter;
   zapesAvoided: number;
   hasTouchedToStart: boolean;
   difficulty: Difficulty;
@@ -58,6 +58,7 @@ export default function SinglePlayerGameContent({
     .shouldCancelWhenOutside(false)
     .onStart(() => scheduleOnRN(handlePressIn))
     .onEnd((_, success) => {
+      // eslint-disable-next-line react-hooks/purity -- This callback executes on gesture completion, not during render.
       scheduleOnRN(handlePressOut, performance.now(), !success);
     });
 

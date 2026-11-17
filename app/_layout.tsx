@@ -5,7 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
 import { FeedbackProvider } from '../feedback/FeedbackProvider';
 import { StatisticsProvider } from '../statistics/StatisticsProvider';
-import { GlobalSettingsProvider } from './GlobalSettings';
+import { GlobalSettingsProvider } from '../contexts/GlobalSettings';
+import { TouchCapacityProvider } from '../contexts/TouchCapacity';
 
 
 export default function RootLayout() {
@@ -21,15 +22,18 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <GlobalSettingsProvider>
-        <StatisticsProvider>
-          <FeedbackProvider>
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="game" />
-            </Stack>
-            <StatusBar style="light" />
-          </FeedbackProvider>
-        </StatisticsProvider>
+        <TouchCapacityProvider>
+          <StatisticsProvider>
+            <FeedbackProvider>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' }, orientation: 'portrait' }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="game" />
+                <Stack.Screen name="multitouch-test" options={{ orientation: 'default' }} />
+              </Stack>
+              <StatusBar style="light" />
+            </FeedbackProvider>
+          </StatisticsProvider>
+        </TouchCapacityProvider>
       </GlobalSettingsProvider>
     </SafeAreaProvider>
   );

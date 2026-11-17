@@ -1,5 +1,6 @@
+/* eslint-disable react-hooks/refs -- Gesture callbacks use mutable pointer ownership outside render. */
 import { Heart } from 'lucide-react-native';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -38,6 +39,10 @@ function placementFor(outcome: GeneralRoundOutcome | null, playerId: GeneralPlay
   return outcome?.placements.find((placement) => placement.playerIds.includes(playerId))?.rank ?? null;
 }
 
+function geometryGeneration(width: number, height: number, playerCount: number) {
+  return Math.round(width * 1000) * 31 + Math.round(height * 1000) * 17 + playerCount;
+}
+
 export default function RadialMultiplayerArena({
   session,
   matchFormat,
@@ -56,24 +61,18 @@ export default function RadialMultiplayerArena({
     centerRatio: session.players.length >= 7 ? 0.16 : 0.19,
     rotation: -90,
   }), [height, session.players.length, width]);
-  const generationRef = useRef(0);
-  const geometryKeyRef = useRef('');
-  const geometryKey = `${width}:${height}:${session.players.length}`;
-  if (geometryKeyRef.current !== geometryKey) {
-    geometryKeyRef.current = geometryKey;
-    generationRef.current += 1;
-  }
-  const generation = generationRef.current;
+  const generation = geometryGeneration(width, height, session.players.length);
   const ownershipRef = useRef(createRadialPointerOwnership(generation));
-  if (ownershipRef.current.generation !== generation) {
-    ownershipRef.current = createRadialPointerOwnership(generation);
-  }
   const playerIds = useMemo(() => session.players.map((player) => player.id), [session.players]);
   const activePlayerIds = useMemo(() => new Set(
     session.players.filter((player) => player.isActive).map((player) => player.id)
   ), [session.players]);
   const runtimeRef = useRef({ geometry, playerIds, activePlayerIds, onPressIn, onPressOut });
-  runtimeRef.current = { geometry, playerIds, activePlayerIds, onPressIn, onPressOut };
+
+  useEffect(() => {
+    ownershipRef.current = createRadialPointerOwnership(generation);
+    runtimeRef.current = { geometry, playerIds, activePlayerIds, onPressIn, onPressOut };
+  }, [activePlayerIds, generation, geometry, onPressIn, onPressOut, playerIds]);
 
   const handlePointerDown = useCallback((
     pointerId: number,
@@ -114,6 +113,7 @@ export default function RadialMultiplayerArena({
       );
     })
     .onTouchesUp((event, manager) => {
+      // eslint-disable-next-line react-hooks/purity -- This callback executes on touch release, not during render.
       const timestamp = performance.now();
       event.changedTouches.forEach((touch) =>
         scheduleOnRN(handlePointerEnd, touch.id, timestamp, false, generation)
@@ -121,6 +121,7 @@ export default function RadialMultiplayerArena({
       if (event.allTouches.length === 0) manager.end();
     })
     .onTouchesCancelled((event, manager) => {
+      // eslint-disable-next-line react-hooks/purity -- This callback executes on touch cancellation, not during render.
       const timestamp = performance.now();
       event.changedTouches.forEach((touch) =>
         scheduleOnRN(handlePointerEnd, touch.id, timestamp, true, generation)

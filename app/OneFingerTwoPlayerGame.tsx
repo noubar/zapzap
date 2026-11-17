@@ -30,7 +30,7 @@ import { useFeedback } from '../feedback/FeedbackProvider';
 import type { FeedbackEvent } from '../feedback/feedbackPolicy';
 import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { getReactionDeadline } from '../settings/gameSettings';
-import { useGlobalSettings } from './GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 
 type GameState = 'idle' | 'waiting' | 'zap' | 'round-result' | 'game-over';
 
@@ -63,6 +63,7 @@ export default function OneFingerTwoPlayerGameScreen() {
   const signalTimeRef = useRef<number | null>(null);
   const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const matchFormatRef = useRef(settings.matchFormat);
+  const [matchFormat, setMatchFormat] = useState(settings.matchFormat);
   const touchHeldRef = useRef({ p1: false, p2: false });
   const roundResultsRef = useRef<MultiplayerRoundResults>(initialMatch.results);
   const gameStateRef = useRef<GameState>('idle');
@@ -125,6 +126,7 @@ export default function OneFingerTwoPlayerGameScreen() {
     resetReadiness();
     replaceRoundResults(nextMatch.results);
     matchFormatRef.current = settings.matchFormat;
+    setMatchFormat(settings.matchFormat);
     const resetScore = {
       lives: nextMatch.lives,
       roundWins: nextMatch.roundWins,
@@ -374,7 +376,7 @@ export default function OneFingerTwoPlayerGameScreen() {
         isFilled={isFilled}
         lives={matchScore.lives}
         roundWins={matchScore.roundWins}
-        matchFormat={matchFormatRef.current}
+        matchFormat={matchFormat}
         onPlayerPressIn={onPlayerPressIn}
         onPlayerPressOut={onPlayerPressOut}
         roundWinner={roundWinner}

@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useGlobalSettings } from '../app/GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 import { arcadeColors, arcadeMetrics, arcadeTypography } from '../constants/ArcadeTheme';
 import type { AchievementDefinition } from '../statistics/achievements';
 import ResultFeedbackView from './ResultFeedbackView';

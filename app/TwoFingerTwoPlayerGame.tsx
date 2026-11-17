@@ -32,7 +32,7 @@ import { useFeedback } from '../feedback/FeedbackProvider';
 import type { FeedbackEvent } from '../feedback/feedbackPolicy';
 import { createStatisticsSessionId, useStatistics } from '../statistics/StatisticsProvider';
 import { getReactionDeadline } from '../settings/gameSettings';
-import { useGlobalSettings } from './GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 
 type BoxIndex = 0 | 1;
 type MultiplayerFakeSignal = FakeSignalEvent & {
@@ -69,6 +69,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
   const signalTimeRef = useRef<number | null>(null);
   const roundDeadlineRef = useRef(getReactionDeadline(settings.difficulty));
   const matchFormatRef = useRef(settings.matchFormat);
+  const [matchFormat, setMatchFormat] = useState(settings.matchFormat);
   const targetsRef = useRef<{ p1: BoxIndex | null; p2: BoxIndex | null }>({ p1: null, p2: null });
   const roundResultsRef = useRef<MultiplayerRoundResults>(initialMatch.results);
   const touchHeldRef = useRef<{ p1: [boolean, boolean]; p2: [boolean, boolean] }>({
@@ -140,6 +141,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
     replaceTargets({ p1: null, p2: null });
     replaceRoundResults(nextMatch.results);
     matchFormatRef.current = settings.matchFormat;
+    setMatchFormat(settings.matchFormat);
     const resetScore = {
       lives: nextMatch.lives,
       roundWins: nextMatch.roundWins,
@@ -397,7 +399,7 @@ export default function TwoFingerTwoPlayerGameScreen() {
         targets={targets}
         lives={matchScore.lives}
         roundWins={matchScore.roundWins}
-        matchFormat={matchFormatRef.current}
+        matchFormat={matchFormat}
         onBoxPressIn={onBoxPressIn}
         onBoxPressOut={onBoxPressOut}
         roundWinner={roundWinner}

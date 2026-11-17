@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import type { Href } from 'expo-router';
 import { BarChart3, SlidersHorizontal, User, Users } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -10,9 +10,29 @@ import {
   arcadeMetrics,
   arcadeTypography,
 } from '../constants/ArcadeTheme';
+import PlayerCountSlider from '../components/PlayerCountSlider';
+import { usePersistedPlayerCount } from '../hooks/usePersistedPlayerCount';
+import { useTouchCapacity } from '../contexts/TouchCapacity';
+import {
+  MAX_ONE_FINGER_MULTIPLAYER_PLAYERS,
+  MIN_ONE_FINGER_MULTIPLAYER_PLAYERS,
+  SMARTPHONE_MAX_PLAYERS,
+  calculateEffectivePlayerCapacity,
+  calculateOneFingerPlayerCapacity,
+  getOneFingerMultiplayerHref,
+} from '../settings/playerCount';
 
 export default function MenuScreen() {
+  const { width, height } = useWindowDimensions();
+  const { observedCapacity } = useTouchCapacity();
   const [fingerMode, setFingerMode] = useState<1 | 2>(1);
+  const [showPlayerCount, setShowPlayerCount] = useState(false);
+  const screenSpaceCapacity = Math.min(
+    MAX_ONE_FINGER_MULTIPLAYER_PLAYERS,
+    calculateOneFingerPlayerCapacity(width, height)
+  );
+  const playerCapacity = calculateEffectivePlayerCapacity(screenSpaceCapacity, observedCapacity);
+  const [playerCount, setPlayerCount] = usePersistedPlayerCount(playerCapacity);
 
   const menuOptions = useMemo(
     () => [
@@ -34,22 +54,22 @@ export default function MenuScreen() {
       },
       {
         id: 'two-1',
-        label: 'Two Players',
-        subtext: 'One button per player',
+        label: 'Multiplayer',
+        subtext: `Choose 2 to ${playerCapacity} local players`,
         icon: <Users size={34} color={arcadeColors.text} />,
-        onPress: () => router.push('/OneFingerTwoPlayerGame'),
+        onPress: () => setShowPlayerCount((visible) => !visible),
         fingerMode: 1 as const,
       },
       {
         id: 'two-2',
-        label: 'Two Players',
+        label: 'Multiplayer',
         subtext: 'Two target buttons per player',
         icon: <Users size={34} color={arcadeColors.text} />,
         onPress: () => router.push('/TwoFingerTwoPlayerGame'),
         fingerMode: 2 as const,
       },
     ],
-    []
+    [playerCapacity]
   );
 
   const visibleOptions = useMemo(
@@ -104,7 +124,10 @@ export default function MenuScreen() {
                       selected && styles.switchButtonActive,
                       pressed && styles.pressed,
                     ]}
-                    onPress={() => setFingerMode(mode as 1 | 2)}
+                    onPress={() => {
+                      setFingerMode(mode as 1 | 2);
+                      setShowPlayerCount(false);
+                    }}
                     accessibilityRole="radio"
                     accessibilityLabel={mode + ' finger mode'}
                     accessibilityState={{ checked: selected }}
@@ -140,6 +163,45 @@ export default function MenuScreen() {
                 <Text style={styles.arrow}>›</Text>
               </Pressable>
             ))}
+            {fingerMode === 1 && showPlayerCount ? (
+              <View style={styles.playerSelection}>
+                <PlayerCountSlider
+                  value={playerCount}
+                  minimum={MIN_ONE_FINGER_MULTIPLAYER_PLAYERS}
+                  maximum={playerCapacity}
+                  onChange={setPlayerCount}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Start ${playerCount} player game`}
+                  style={({ pressed }) => [styles.startButton, pressed && styles.pressed]}
+                  onPress={() => router.push(
+                    getOneFingerMultiplayerHref(
+                      playerCount,
+                      playerCapacity,
+                      screenSpaceCapacity > SMARTPHONE_MAX_PLAYERS
+                    ) as Href
+                  )}
+                  testID="start-multiplayer-game"
+                >
+                  <Text style={styles.startButtonText}>START {playerCount} PLAYERS</Text>
+                </Pressable>
+                {screenSpaceCapacity > SMARTPHONE_MAX_PLAYERS ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.calibrationButton, pressed && styles.pressed]}
+                    onPress={() => router.push('/multitouch-test' as Href)}
+                  >
+                    <Text style={styles.calibrationText}>TEST MULTITOUCH</Text>
+                    <Text style={styles.calibrationStatus}>
+                      {observedCapacity === null
+                        ? `VERIFY 5–${screenSpaceCapacity} FINGERS`
+                        : `HIGHEST OBSERVED: ${observedCapacity}`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.ruleCard}>
@@ -250,6 +312,29 @@ const styles = StyleSheet.create({
   buttonContainer: {
     gap: arcadeMetrics.spacing.sm,
   },
+  playerSelection: { gap: arcadeMetrics.spacing.sm },
+  startButton: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: arcadeMetrics.radiusSmall,
+    backgroundColor: arcadeColors.outline,
+  },
+  startButtonText: {
+    ...arcadeTypography.body,
+    color: arcadeColors.signalText,
+    fontWeight: '900',
+  },
+  calibrationButton: {
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: arcadeColors.outline,
+    borderRadius: arcadeMetrics.radiusSmall,
+  },
+  calibrationText: { ...arcadeTypography.body, fontWeight: '900' },
+  calibrationStatus: { ...arcadeTypography.caption, marginTop: 2, color: arcadeColors.success },
   menuButton: {
     minHeight: 96,
     flexDirection: 'row',

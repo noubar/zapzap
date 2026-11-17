@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import type { Router } from 'expo-router';
+import type { ImperativeRouter } from 'expo-router';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
@@ -21,7 +21,7 @@ interface TwoFingerSinglePlayerContentProps {
   reactionTime: number;
   bestReactionTime: number | null;
   resetGame: () => void;
-  router: Router;
+  router: ImperativeRouter;
   zapsAvoided: number;
   hasTouchedToStart: { left: boolean; right: boolean };
   difficulty: Difficulty;

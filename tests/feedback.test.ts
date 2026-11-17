@@ -66,12 +66,12 @@ function makePlayers(overrides: Partial<FeedbackAudioPlayer> = {}) {
   };
 }
 
-test('audio playback failures are isolated from gameplay', async () => {
+test('audio seek failures fall back to direct playback without escaping', async () => {
   const { calls, players } = makePlayers({ seekTo: async () => { calls.seek += 1; throw new Error('audio unavailable'); } });
   const audio = new AudioPlaybackCoordinator(players);
   assert.doesNotThrow(() => audio.play('go', () => true));
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(calls.play, 0);
+  assert.equal(calls.play, 1);
 });
 
 test('turning sound off while playback prepares suppresses the pending sound', async () => {

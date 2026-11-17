@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "zapzap",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.noubar.zapzap"
@@ -18,7 +17,6 @@
         "foregroundImage": "./assets/images/icon.png",
         "monochromeImage": "./assets/images/icon.png"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.noubar.zapzap",
       "versionCode": 1

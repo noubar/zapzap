@@ -11,7 +11,7 @@ import {
   MATCH_FORMAT_LABELS,
   MATCH_FORMATS,
 } from '../settings/gameSettings';
-import { useGlobalSettings } from './GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 
 type ToggleRowProps = {
   label: string;

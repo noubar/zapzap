@@ -15,9 +15,12 @@ export class AudioPlaybackCoordinator {
     const sequence = (this.sequence.get(sound) ?? 0) + 1;
     this.sequence.set(sound, sequence);
     const player = this.players[sound];
-    void player.seekTo(0).then(() => {
-      if (this.sequence.get(sound) === sequence && canPlay()) player.play();
-    }).catch(() => undefined);
+    void player.seekTo(0)
+      .catch(() => undefined)
+      .then(() => {
+        if (this.sequence.get(sound) !== sequence || !canPlay()) return;
+        try { player.play(); } catch { /* Playback errors are intentionally isolated. */ }
+      });
   }
 
   cancelAll() {

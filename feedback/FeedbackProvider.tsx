@@ -16,7 +16,7 @@ import {
 } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { useGlobalSettings } from '../app/GlobalSettings';
+import { useGlobalSettings } from '../contexts/GlobalSettings';
 import {
   FeedbackEventGate,
   getFeedbackPlan,
@@ -42,8 +42,10 @@ const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
 function runHaptic(name: HapticName) {
   if (Platform.OS === 'android') {
+    if (name === 'signal') {
+      return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
     const androidType = {
-      signal: Haptics.AndroidHaptics.Virtual_Key,
       success: Haptics.AndroidHaptics.Confirm,
       error: Haptics.AndroidHaptics.Reject,
       'round-win': Haptics.AndroidHaptics.Confirm,
@@ -63,8 +65,11 @@ function runHaptic(name: HapticName) {
 export function FeedbackProvider({ children }: PropsWithChildren) {
   const { settings } = useGlobalSettings();
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
   const gateRef = useRef(new FeedbackEventGate());
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const go = useAudioPlayer(require('../assets/sounds/go.wav'), { downloadFirst: true });
   const success = useAudioPlayer(require('../assets/sounds/success.wav'), { downloadFirst: true });
@@ -84,7 +89,7 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const gate = gateRef.current;
     void setAudioModeAsync({
-      playsInSilentMode: false,
+      playsInSilentMode: true,
       interruptionMode: 'mixWithOthers',
       shouldPlayInBackground: false,
     }).catch(() => undefined);

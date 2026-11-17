@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   PanResponder,
   Pressable,
@@ -27,15 +27,11 @@ export default function PlayerCountSlider({
   onChange,
 }: PlayerCountSliderProps) {
   const [trackWidth, setTrackWidth] = useState(0);
-  const latestWidth = useRef(0);
-  const latestValue = useRef(value);
-  latestValue.current = value;
 
   const valueFromX = useCallback((x: number) => {
-    const width = latestWidth.current;
-    if (width <= 0 || maximum <= minimum) return minimum;
-    return clampPlayerCount(minimum + (x / width) * (maximum - minimum), maximum);
-  }, [maximum, minimum]);
+    if (trackWidth <= 0 || maximum <= minimum) return minimum;
+    return clampPlayerCount(minimum + (x / trackWidth) * (maximum - minimum), maximum);
+  }, [maximum, minimum, trackWidth]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -47,7 +43,6 @@ export default function PlayerCountSlider({
 
   const onLayout = (event: LayoutChangeEvent) => {
     const width = event.nativeEvent.layout.width;
-    latestWidth.current = width;
     setTrackWidth(width);
   };
 
@@ -65,7 +60,7 @@ export default function PlayerCountSlider({
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(event) => {
         const delta = event.nativeEvent.actionName === 'increment' ? 1 : -1;
-        onChange(clampPlayerCount(latestValue.current + delta, maximum));
+        onChange(clampPlayerCount(value + delta, maximum));
       }}
       style={styles.container}
       testID="player-count-slider"

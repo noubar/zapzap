@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PropsWithChildren } from 'react';
+import { useEffect, useState, type PropsWithChildren } from 'react';
 import { Animated, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -12,9 +12,9 @@ type ResultFeedbackViewProps = PropsWithChildren<{
 
 export default function ResultFeedbackView({ children, enabled, kind, style }: ResultFeedbackViewProps) {
   const reducedMotion = useReducedMotion();
-  const opacity = useRef(new Animated.Value(1)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-  const translateX = useRef(new Animated.Value(0)).current;
+  const [opacity] = useState(() => new Animated.Value(1));
+  const [scale] = useState(() => new Animated.Value(1));
+  const [translateX] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     opacity.stopAnimation();

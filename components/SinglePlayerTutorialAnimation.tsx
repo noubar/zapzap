@@ -14,10 +14,10 @@ const CYCLE_DURATION_MS = 5200;
 
 export default function SinglePlayerTutorialAnimation() {
   const [stepIndex, setStepIndex] = useState(0);
-  const fingerProgress = useRef(new Animated.Value(0)).current;
-  const fillProgress = useRef(new Animated.Value(0)).current;
-  const zapOpacity = useRef(new Animated.Value(0)).current;
-  const hintOpacity = useRef(new Animated.Value(0)).current;
+  const [fingerProgress] = useState(() => new Animated.Value(0));
+  const [fillProgress] = useState(() => new Animated.Value(0));
+  const [zapOpacity] = useState(() => new Animated.Value(0));
+  const [hintOpacity] = useState(() => new Animated.Value(0));
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   const fingerTranslate = fingerProgress.interpolate({

@@ -48,6 +48,10 @@ All notable changes to this project are documented in this file.
 
 ### Changed
 
+- Restored the older heavy-impact Android haptic specifically for the real GO signal to reduce perceived onset delay on affected devices; other Android feedback retains the system haptics engine mappings.
+- Upgraded the application from Expo SDK 54 to SDK 58 with React 19.3, React Native 0.88, Expo Router 58, TypeScript 6, and SDK-aligned native dependencies.
+- Updated Router typing, React Native absolute-fill styles, animated-value initialization, and compiler-safe state snapshots for the SDK 58 strict TypeScript and React lint rules.
+- Removed redundant New Architecture configuration and obsolete Android edge-to-edge configuration; generated native projects now rebuild from the SDK 58 template through Expo's Continuous Native Generation workflow.
 - The one-finger player slider now exposes 2–8 only within the intersection of usable radial geometry and observed multitouch capacity; unknown higher-touch capability safely remains capped at four with a visible calibration path.
 - Eligible tablet-sized multiplayer routes use the radial renderer while smartphone routes retain their original rectangular and top/bottom presentations.
 - The app permits orientation changes only for the radial multiplayer and calibration routes; existing smartphone gameplay remains portrait, and active rounds are cancelled safely when viewport geometry changes.
@@ -87,6 +91,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Moved the global settings provider outside the Expo Router `app` directory so SDK 58 no longer treats it as a route or warns about a missing default export.
+- Restored Android sound effects in Expo Go by allowing playback in silent/vibrate mode and falling back to direct playback when an unloaded SDK 58 audio player rejects an initial seek.
 - Web screenshot automation now uses one consistent viewport and pixel density for every page, uses the current accessible control-mode label, captures each route in isolation, continues attempting later routes after an individual failure, and includes the Game Options screen.
 - Duplicate releases, competing timeout callbacks, rerenders, and repeated match settlement cannot record the same statistics event or achievement twice.
 - Reset Statistics clears records and achievements without changing difficulty, match format, Fake Signals, sound, haptic, or visual preferences.
