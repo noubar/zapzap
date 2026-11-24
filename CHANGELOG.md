@@ -6,6 +6,7 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- An Android-native Oboe GO-signal module that decodes the owner-provided PCM zap once, warms a low-latency callback stream only during active rounds, and dispatches playback plus the established heavy vibration from one native call, with the existing Expo feedback path retained as a safe fallback.
 - A responsive annular radial arena for 2–8 one-finger players on eligible larger viewports, using equal dynamic sectors, a noninteractive neutral center, rotated local labels, and compact per-player results.
 - Pure radial geometry and hit-testing utilities for configurable dimensions, center radius, rotation, exact angular boundaries, center exclusion, and outside-circle rejection.
 - Arena-wide pointer-ID ownership that assigns contacts from their starting coordinates, preserves ownership across movement, rejects extra contacts in occupied sectors, and resolves releases exactly once.
@@ -59,12 +60,12 @@ All notable changes to this project are documented in this file.
 - Expanded one-finger rounds continue after an individual false start, exclude that player from the remaining round, and delay player-specific outcome feedback until safe settlement.
 - Three Lives now penalizes invalid expanded-mode participants first, otherwise penalizes the exactly slowest valid placement; eliminated players no longer participate in readiness checks.
 - Restored a filled heart icon after every in-game lives value in both multiplayer control modes.
-- The Expo application version is now `2.2.2`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- The Expo application and package version is now `2.2.3`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
 - The main menu now distributes its sections across the available screen height while retaining scrolling on smaller displays.
 - The main menu now links to Statistics and Achievements without adding detailed progress data to the gameplay selection interface.
 - All four authoritative round settlement paths publish statistics only after gameplay has captured and validated outcomes; persistence is initiated only after competitive waiting and GO states have ended.
 - Interrupted or abandoned single-player rounds do not invent a success or failure and leave the previously persisted streak unchanged.
-- The valid-GO sound now uses the project owner's supplied electrical-zap recording, trimmed and time-compressed from roughly 780 ms to 124 ms with a short fade for responsive repeated play.
+- The valid-GO sound now uses the project owner's replacement `zt.wav`, whose zap begins at the start of the file; the earlier source MP3 and shortened WAV remain available but unused.
 - Sound Effects and Visual Effects are now active persistent Game Options instead of unavailable placeholders; resetting options restores both to their enabled defaults.
 - GO presentation remains the authoritative timing event: feedback is dispatched only after the existing frame timestamp is established and is never awaited by reaction measurement.
 - Haptic feedback now includes lightweight success, error, round, match, and menu mappings, including Android system haptic constants where available.
@@ -91,6 +92,7 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Removed the asynchronous seek round-trip before the real GO sound; the preloaded zap player now rewinds and starts in the same JavaScript turn, matching the SDK 58 replay pattern and reducing Android onset delay.
 - Moved the global settings provider outside the Expo Router `app` directory so SDK 58 no longer treats it as a route or warns about a missing default export.
 - Restored Android sound effects in Expo Go by allowing playback in silent/vibrate mode and falling back to direct playback when an unloaded SDK 58 audio player rejects an initial seek.
 - Web screenshot automation now uses one consistent viewport and pixel density for every page, uses the current accessible control-mode label, captures each route in isolation, continues attempting later routes after an individual failure, and includes the Game Options screen.

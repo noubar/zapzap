@@ -21,10 +21,11 @@
       }
     },
     "preview": {
+      "developmentClient": false,
       "distribution": "internal",
       "channel": "main",
       "android": {
-        "image": "latest"
+        "buildType": "apk"
       },
       "ios": {
         "image": "latest"
