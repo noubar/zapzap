@@ -69,9 +69,20 @@ function makePlayers(overrides: Partial<FeedbackAudioPlayer> = {}) {
 test('audio seek failures fall back to direct playback without escaping', async () => {
   const { calls, players } = makePlayers({ seekTo: async () => { calls.seek += 1; throw new Error('audio unavailable'); } });
   const audio = new AudioPlaybackCoordinator(players);
-  assert.doesNotThrow(() => audio.play('go', () => true));
+  assert.doesNotThrow(() => audio.play('success', () => true));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(calls.play, 1);
+});
+
+test('GO playback does not wait for an asynchronous rewind', () => {
+  let resolveSeek: (() => void) | undefined;
+  const { calls, players } = makePlayers({
+    seekTo: () => new Promise<void>((resolve) => { resolveSeek = resolve; }),
+  });
+  const audio = new AudioPlaybackCoordinator(players);
+  audio.play('go', () => true);
+  assert.equal(calls.play, 1);
+  resolveSeek?.();
 });
 
 test('turning sound off while playback prepares suppresses the pending sound', async () => {
@@ -79,7 +90,7 @@ test('turning sound off while playback prepares suppresses the pending sound', a
   const { calls, players } = makePlayers({ seekTo: () => new Promise<void>((resolve) => { resolveSeek = resolve; }) });
   const audio = new AudioPlaybackCoordinator(players);
   let soundEnabled = true;
-  audio.play('go', () => soundEnabled);
+  audio.play('success', () => soundEnabled);
   soundEnabled = false;
   resolveSeek?.();
   await new Promise((resolve) => setImmediate(resolve));

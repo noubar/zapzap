@@ -1,10 +1,10 @@
-import * as Haptics from 'expo-haptics';
 import {
   setAudioModeAsync,
   setIsAudioActiveAsync,
   useAudioPlayer,
   type AudioPlayer,
-} from 'expo-audio';
+} from "expo-audio";
+import * as Haptics from "expo-haptics";
 import {
   createContext,
   useCallback,
@@ -13,18 +13,24 @@ import {
   useMemo,
   useRef,
   type PropsWithChildren,
-} from 'react';
-import { AppState, Platform } from 'react-native';
+} from "react";
+import { AppState, Platform } from "react-native";
 
-import { useGlobalSettings } from '../contexts/GlobalSettings';
+import { useGlobalSettings } from "../contexts/GlobalSettings";
+import { AudioPlaybackCoordinator } from "./audioPlayback";
 import {
   FeedbackEventGate,
   getFeedbackPlan,
   type FeedbackEvent,
   type HapticName,
   type SoundName,
-} from './feedbackPolicy';
-import { AudioPlaybackCoordinator } from './audioPlayback';
+} from "./feedbackPolicy";
+import {
+  armNativeGoSignal,
+  emitNativeGoSignal,
+  prepareNativeGoSignal,
+  stopNativeGoSignal,
+} from "./nativeGoSignal";
 
 type EmitOptions = {
   fakeSignalsEnabled?: boolean;
@@ -41,24 +47,28 @@ type FeedbackContextValue = {
 const FeedbackContext = createContext<FeedbackContextValue | null>(null);
 
 function runHaptic(name: HapticName) {
-  if (Platform.OS === 'android') {
-    if (name === 'signal') {
+  if (Platform.OS === "android") {
+    if (name === "signal") {
       return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
     const androidType = {
       success: Haptics.AndroidHaptics.Confirm,
       error: Haptics.AndroidHaptics.Reject,
-      'round-win': Haptics.AndroidHaptics.Confirm,
-      'match-win': Haptics.AndroidHaptics.Confirm,
+      "round-win": Haptics.AndroidHaptics.Confirm,
+      "match-win": Haptics.AndroidHaptics.Confirm,
       selection: Haptics.AndroidHaptics.Segment_Tick,
     }[name];
     return Haptics.performAndroidHapticsAsync(androidType);
   }
-  if (name === 'signal') return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-  if (name === 'success') return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  if (name === 'error') return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  if (name === 'match-win') return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  if (name === 'selection') return Haptics.selectionAsync();
+  if (name === "signal")
+    return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  if (name === "success")
+    return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  if (name === "error")
+    return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  if (name === "match-win")
+    return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  if (name === "selection") return Haptics.selectionAsync();
   return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 }
 
@@ -71,41 +81,79 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
     settingsRef.current = settings;
   }, [settings]);
 
-  const go = useAudioPlayer(require('../assets/sounds/go.wav'), { downloadFirst: true });
-  const success = useAudioPlayer(require('../assets/sounds/success.wav'), { downloadFirst: true });
-  const error = useAudioPlayer(require('../assets/sounds/error.wav'), { downloadFirst: true });
-  const timeout = useAudioPlayer(require('../assets/sounds/timeout.wav'), { downloadFirst: true });
-  const wrong = useAudioPlayer(require('../assets/sounds/wrong.wav'), { downloadFirst: true });
-  const roundWin = useAudioPlayer(require('../assets/sounds/roundWin.wav'), { downloadFirst: true });
-  const matchWin = useAudioPlayer(require('../assets/sounds/matchWin.wav'), { downloadFirst: true });
-  const draw = useAudioPlayer(require('../assets/sounds/draw.wav'), { downloadFirst: true });
-  const menu = useAudioPlayer(require('../assets/sounds/menu.wav'), { downloadFirst: true });
+  const go = useAudioPlayer(require("../assets/sounds/zt.wav"), {
+    downloadFirst: true,
+  });
+  const success = useAudioPlayer(require("../assets/sounds/success.wav"), {
+    downloadFirst: true,
+  });
+  const error = useAudioPlayer(require("../assets/sounds/error.wav"), {
+    downloadFirst: true,
+  });
+  const timeout = useAudioPlayer(require("../assets/sounds/timeout.wav"), {
+    downloadFirst: true,
+  });
+  const wrong = useAudioPlayer(require("../assets/sounds/wrong.wav"), {
+    downloadFirst: true,
+  });
+  const roundWin = useAudioPlayer(require("../assets/sounds/roundWin.wav"), {
+    downloadFirst: true,
+  });
+  const matchWin = useAudioPlayer(require("../assets/sounds/matchWin.wav"), {
+    downloadFirst: true,
+  });
+  const draw = useAudioPlayer(require("../assets/sounds/draw.wav"), {
+    downloadFirst: true,
+  });
+  const menu = useAudioPlayer(require("../assets/sounds/menu.wav"), {
+    downloadFirst: true,
+  });
 
-  const players = useMemo<Record<SoundName, AudioPlayer>>(() => ({
-    go, success, error, timeout, wrong, roundWin, matchWin, draw, menu,
-  }), [draw, error, go, matchWin, menu, roundWin, success, timeout, wrong]);
+  const players = useMemo<Record<SoundName, AudioPlayer>>(
+    () => ({
+      go,
+      success,
+      error,
+      timeout,
+      wrong,
+      roundWin,
+      matchWin,
+      draw,
+      menu,
+    }),
+    [draw, error, go, matchWin, menu, roundWin, success, timeout, wrong],
+  );
   const audio = useMemo(() => new AudioPlaybackCoordinator(players), [players]);
+
+  useEffect(() => {
+    void prepareNativeGoSignal();
+    return stopNativeGoSignal;
+  }, []);
 
   useEffect(() => {
     const gate = gateRef.current;
     void setAudioModeAsync({
       playsInSilentMode: true,
-      interruptionMode: 'mixWithOthers',
+      interruptionMode: "mixWithOthers",
       shouldPlayInBackground: false,
     }).catch(() => undefined);
-    void setIsAudioActiveAsync(AppState.currentState === 'active').catch(() => undefined);
+    void setIsAudioActiveAsync(AppState.currentState === "active").catch(
+      () => undefined,
+    );
 
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state !== "active") {
         gate.invalidate();
         audio.cancelAll();
+        stopNativeGoSignal();
       }
-      void setIsAudioActiveAsync(state === 'active').catch(() => undefined);
+      void setIsAudioActiveAsync(state === "active").catch(() => undefined);
     });
     return () => {
       subscription.remove();
       gate.invalidate();
       audio.cancelAll();
+      stopNativeGoSignal();
       void setIsAudioActiveAsync(false).catch(() => undefined);
     };
   }, [audio]);
@@ -113,40 +161,65 @@ export function FeedbackProvider({ children }: PropsWithChildren) {
   const cancelFeedback = useCallback(() => {
     gateRef.current.invalidate();
     audio.cancelAll();
+    stopNativeGoSignal();
   }, [audio]);
 
   const beginFeedbackSession = useCallback(() => {
     audio.cancelAll();
+    if (settingsRef.current.soundEnabled) armNativeGoSignal();
     return gateRef.current.beginSession();
   }, [audio]);
 
-  const emitFeedback = useCallback((event: FeedbackEvent, options: EmitOptions = {}) => {
-    const gate = gateRef.current;
-    const session = options.session ?? gate.beginSession();
-    if (!gate.accept(session, options.eventId)) return;
-    const plan = getFeedbackPlan(event, settingsRef.current, options.fakeSignalsEnabled ?? false);
-
-    if (plan.haptic) void runHaptic(plan.haptic).catch(() => undefined);
-    if (!plan.sound) return;
-
-    audio.play(plan.sound, () => {
-      const currentPlan = getFeedbackPlan(event, settingsRef.current, options.fakeSignalsEnabled ?? false);
-      return (
-        gate.isCurrent(session) &&
-        currentPlan.sound === plan.sound
+  const emitFeedback = useCallback(
+    (event: FeedbackEvent, options: EmitOptions = {}) => {
+      const gate = gateRef.current;
+      const session = options.session ?? gate.beginSession();
+      if (!gate.accept(session, options.eventId)) return;
+      const plan = getFeedbackPlan(
+        event,
+        settingsRef.current,
+        options.fakeSignalsEnabled ?? false,
       );
-    });
-  }, [audio]);
 
-  const value = useMemo(() => ({ beginFeedbackSession, cancelFeedback, emitFeedback }), [
-    beginFeedbackSession, cancelFeedback, emitFeedback,
-  ]);
-  return <FeedbackContext.Provider value={value}>{children}</FeedbackContext.Provider>;
+      const nativeResult =
+        event === "go"
+          ? emitNativeGoSignal(
+              plan.sound === "go",
+              plan.haptic === "signal",
+            )
+          : null;
+
+      if (plan.haptic && !nativeResult?.haptic) {
+        void runHaptic(plan.haptic).catch(() => undefined);
+      }
+      if (!plan.sound || nativeResult?.sound) return;
+
+      audio.play(plan.sound, () => {
+        const currentPlan = getFeedbackPlan(
+          event,
+          settingsRef.current,
+          options.fakeSignalsEnabled ?? false,
+        );
+        return gate.isCurrent(session) && currentPlan.sound === plan.sound;
+      });
+    },
+    [audio],
+  );
+
+  const value = useMemo(
+    () => ({ beginFeedbackSession, cancelFeedback, emitFeedback }),
+    [beginFeedbackSession, cancelFeedback, emitFeedback],
+  );
+  return (
+    <FeedbackContext.Provider value={value}>
+      {children}
+    </FeedbackContext.Provider>
+  );
 }
 
 export function useFeedback() {
   const value = useContext(FeedbackContext);
-  if (!value) throw new Error('useFeedback must be used inside FeedbackProvider');
+  if (!value)
+    throw new Error("useFeedback must be used inside FeedbackProvider");
   return value;
 }
-
