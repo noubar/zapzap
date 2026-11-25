@@ -60,7 +60,7 @@ All notable changes to this project are documented in this file.
 - Expanded one-finger rounds continue after an individual false start, exclude that player from the remaining round, and delay player-specific outcome feedback until safe settlement.
 - Three Lives now penalizes invalid expanded-mode participants first, otherwise penalizes the exactly slowest valid placement; eliminated players no longer participate in readiness checks.
 - Restored a filled heart icon after every in-game lives value in both multiplayer control modes.
-- The Expo application and package version is now `2.2.3`; the existing Android `versionCode` and EAS production auto-increment configuration remain unchanged.
+- Bumped the Expo app and npm package version to `2.2.4`.
 - The main menu now distributes its sections across the available screen height while retaining scrolling on smaller displays.
 - The main menu now links to Statistics and Achievements without adding detailed progress data to the gameplay selection interface.
 - All four authoritative round settlement paths publish statistics only after gameplay has captured and validated outcomes; persistence is initiated only after competitive waiting and GO states have ended.
@@ -92,6 +92,8 @@ All notable changes to this project are documented in this file.
 
 ### Fixed
 
+- Updated Expo, Expo Dev Client, Expo Router, and Expo Web Browser to their Expo SDK 58 compatible versions.
+- Aligned the Android native GO-signal library to 16 KB memory pages for Google Play compatibility.
 - Removed the asynchronous seek round-trip before the real GO sound; the preloaded zap player now rewinds and starts in the same JavaScript turn, matching the SDK 58 replay pattern and reducing Android onset delay.
 - Moved the global settings provider outside the Expo Router `app` directory so SDK 58 no longer treats it as a route or warns about a missing default export.
 - Restored Android sound effects in Expo Go by allowing playback in silent/vibrate mode and falling back to direct playback when an unloaded SDK 58 audio player rejects an initial seek.
